@@ -1,3 +1,15 @@
+## [1.2.0](https://github.com/atakang7/synapse/compare/v1.1.0...v1.2.0) (2026-06-07)
+
+
+### Features
+
+* rename project from bouton to synapse ([f04fb27](https://github.com/atakang7/synapse/commit/f04fb2712e850f2bf4d940e102a533dd0860e084))
+
+
+### Bug Fixes
+
+* **cli:** print assistant reply in non-interactive mode ([bec9b86](https://github.com/atakang7/synapse/commit/bec9b860f13513a4e6404e1fd84eac3eafeafaba))
+
 ## [1.1.0](https://github.com/atakang7/synapse/compare/v1.0.0...v1.1.0) (2026-05-19)
 
 ### Features
