@@ -5,12 +5,12 @@ before:
     - go mod tidy
 
 builds:
-  - id: bouton
-    main: ./cmd/bouton
-    binary: bouton
+  - id: synapse
+    main: ./cmd/synapse
+    binary: synapse
     env:
       - CGO_ENABLED=0
-    # Windows is excluded: bouton depends on github.com/atakang7/axon/agent,
+    # Windows is excluded: synapse depends on github.com/atakang7/axon/agent,
     # whose process-group shell tools are POSIX-only.
     goos:
       - linux
@@ -22,8 +22,8 @@ builds:
       - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
 
 archives:
-  - id: bouton
-    name_template: "bouton_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+  - id: synapse
+    name_template: "synapse_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 
 checksum:
   name_template: "checksums.txt"
@@ -37,7 +37,7 @@ changelog:
 release:
   github:
     owner: atakang7
-    name: bouton
+    name: synapse
   draft: false
   prerelease: auto
   mode: append

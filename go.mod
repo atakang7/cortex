@@ -1,4 +1,4 @@
-module github.com/atakang7/bouton
+module github.com/atakang7/synapse
 
 go 1.26.2
 

@@ -67,7 +67,7 @@ func uiHeader(provider, model string, s *agent.Session) {
 	if uiSilent {
 		return
 	}
-	fmt.Printf("\n%s%s bouton%s  %s%s · %s%s",
+	fmt.Printf("\n%s%s synapse%s  %s%s · %s%s",
 		bold, brand, reset,
 		mute, provider, model, reset)
 	if s.Turn > 0 {
@@ -460,4 +460,3 @@ func (h *ttyHandler) Handle(_ context.Context, e agent.Event) {
 		}
 	}
 }
-

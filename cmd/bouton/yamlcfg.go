@@ -58,20 +58,20 @@ type ToolConfig struct {
 }
 
 // AgentsDir returns the directory where agent YAML files live. Override via
-// BOUTON_AGENTS_DIR; default is $XDG_CONFIG_HOME/axon/agents (or
+// SYNAPSE_AGENTS_DIR; default is $XDG_CONFIG_HOME/axon/agents (or
 // ~/.config/axon/agents).
 func AgentsDir() string {
-	if d := os.Getenv("BOUTON_AGENTS_DIR"); d != "" {
+	if d := os.Getenv("SYNAPSE_AGENTS_DIR"); d != "" {
 		return d
 	}
 	if d := os.Getenv("XDG_CONFIG_HOME"); d != "" {
-		return filepath.Join(d, "bouton", "agents")
+		return filepath.Join(d, "synapse", "agents")
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return "bouton-agents"
+		return "synapse-agents"
 	}
-	return filepath.Join(home, ".config", "bouton", "agents")
+	return filepath.Join(home, ".config", "synapse", "agents")
 }
 
 // LoadAgentConfig reads <name>.yaml from AgentsDir() and validates it.
@@ -161,4 +161,3 @@ func (c *AgentConfig) BuildTools() ([]agent.Tool, error) {
 	}
 	return tools, nil
 }
-
