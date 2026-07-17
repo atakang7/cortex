@@ -1,4 +1,4 @@
-module github.com/atakang7/synapse
+module github.com/atakang7/cortex
 
 go 1.26.2
 

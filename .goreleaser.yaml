@@ -5,12 +5,12 @@ before:
     - go mod tidy
 
 builds:
-  - id: synapse
-    main: ./cmd/synapse
-    binary: synapse
+  - id: cortex
+    main: ./cmd/cortex
+    binary: cortex
     env:
       - CGO_ENABLED=0
-    # Windows is excluded: synapse depends on github.com/atakang7/axon/agent,
+    # Windows is excluded: cortex depends on github.com/atakang7/axon/agent,
     # whose process-group shell tools are POSIX-only.
     goos:
       - linux
@@ -22,8 +22,8 @@ builds:
       - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
 
 archives:
-  - id: synapse
-    name_template: "synapse_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+  - id: cortex
+    name_template: "cortex_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 
 checksum:
   name_template: "checksums.txt"
@@ -37,7 +37,7 @@ changelog:
 release:
   github:
     owner: atakang7
-    name: synapse
+    name: cortex
   draft: false
   prerelease: auto
   mode: append

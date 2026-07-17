@@ -58,20 +58,20 @@ type ToolConfig struct {
 }
 
 // AgentsDir returns the directory where agent YAML files live. Override via
-// SYNAPSE_AGENTS_DIR; default is $XDG_CONFIG_HOME/axon/agents (or
+// CORTEX_AGENTS_DIR; default is $XDG_CONFIG_HOME/axon/agents (or
 // ~/.config/axon/agents).
 func AgentsDir() string {
-	if d := os.Getenv("SYNAPSE_AGENTS_DIR"); d != "" {
+	if d := os.Getenv("CORTEX_AGENTS_DIR"); d != "" {
 		return d
 	}
 	if d := os.Getenv("XDG_CONFIG_HOME"); d != "" {
-		return filepath.Join(d, "synapse", "agents")
+		return filepath.Join(d, "cortex", "agents")
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return "synapse-agents"
+		return "cortex-agents"
 	}
-	return filepath.Join(home, ".config", "synapse", "agents")
+	return filepath.Join(home, ".config", "cortex", "agents")
 }
 
 // LoadAgentConfig reads <name>.yaml from AgentsDir() and validates it.

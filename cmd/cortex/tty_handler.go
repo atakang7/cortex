@@ -67,7 +67,7 @@ func uiHeader(provider, model string, s *agent.Session) {
 	if uiSilent {
 		return
 	}
-	fmt.Printf("\n%s%s synapse%s  %s%s · %s%s",
+	fmt.Printf("\n%s%s cortex%s  %s%s · %s%s",
 		bold, brand, reset,
 		mute, provider, model, reset)
 	if s.Turn > 0 {

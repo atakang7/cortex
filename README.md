@@ -1,35 +1,35 @@
-# synapse
+# cortex
 
 **A terminal coding agent built on the [axon](https://github.com/atakang7/axon) runtime.**
 
-axon ships the loop (streaming chat, tool dispatch, append-only session, secondary-LLM pruning). synapse is the product on top: a coding-agent system prompt, an interactive provider picker, a colored TTY renderer, YAML agent personalities, and slash commands.
+axon ships the loop (streaming chat, tool dispatch, append-only session, secondary-LLM pruning). cortex is the product on top: a coding-agent system prompt, an interactive provider picker, a colored TTY renderer, YAML agent personalities, and slash commands.
 
 ```
 github.com/atakang7/axon/agent  ← runtime (signals)
-github.com/atakang7/synapse     ← coding agent (terminal of the axon)
+github.com/atakang7/cortex     ← coding agent (terminal of the axon)
 ```
 
 ## Install
 
-Pre-built binaries for linux/darwin × amd64/arm64 are attached to each [GitHub Release](https://github.com/atakang7/synapse/releases).
+Pre-built binaries for linux/darwin × amd64/arm64 are attached to each [GitHub Release](https://github.com/atakang7/cortex/releases).
 
 From source:
 
 ```sh
-go install github.com/atakang7/synapse/cmd/synapse@latest
+go install github.com/atakang7/cortex/cmd/cortex@latest
 ```
 
 ## Run
 
 ```sh
-synapse                                  # interactive
-synapse --prompt "summarize TODOs"       # single-shot, exits when the assistant stops
-synapse --agent reviewer                 # load ~/.config/synapse/agents/reviewer.yaml
+cortex                                  # interactive
+cortex --prompt "summarize TODOs"       # single-shot, exits when the assistant stops
+cortex --agent reviewer                 # load ~/.config/cortex/agents/reviewer.yaml
 ```
 
 ### Provider config
 
-synapse reads `${XDG_CONFIG_HOME:-~/.config}/agent/providers.json` (override with `AXON_PROVIDERS_PATH`):
+cortex reads `${XDG_CONFIG_HOME:-~/.config}/agent/providers.json` (override with `AXON_PROVIDERS_PATH`):
 
 ```json
 {
@@ -58,10 +58,10 @@ synapse reads `${XDG_CONFIG_HOME:-~/.config}/agent/providers.json` (override wit
 Or pure env:
 
 ```sh
-LLM_MODEL=gpt-4o LLM_BASE_URL=https://api.openai.com LLM_API_KEY=sk-... synapse
+LLM_MODEL=gpt-4o LLM_BASE_URL=https://api.openai.com LLM_API_KEY=sk-... cortex
 ```
 
-`LLM_PROVIDER` selects one when multiple are configured. With no env hint, synapse offers an interactive picker on first run and remembers your last choice.
+`LLM_PROVIDER` selects one when multiple are configured. With no env hint, cortex offers an interactive picker on first run and remembers your last choice.
 
 ### Slash commands
 
@@ -73,7 +73,7 @@ LLM_MODEL=gpt-4o LLM_BASE_URL=https://api.openai.com LLM_API_KEY=sk-... synapse
 
 ### YAML agent personalities
 
-Place YAML configs under `${SYNAPSE_AGENTS_DIR:-~/.config/synapse/agents}/`:
+Place YAML configs under `${CORTEX_AGENTS_DIR:-~/.config/cortex/agents}/`:
 
 ```yaml
 name: reviewer
@@ -92,20 +92,20 @@ tools:
     timeout_seconds: 10
 ```
 
-Then `synapse --agent reviewer`.
+Then `cortex --agent reviewer`.
 
 ## What's built in
 
-synapse inherits axon's tool set: `read`, `write`, `exec`, `search`, `task`, `bash_output`, `kill_shell`. Every tool call requires a `reason` field. File writes are atomic, so `/undo` is byte-exact. Ctrl-C cancels the in-flight turn — both the model stream and any running subprocess.
+cortex inherits axon's tool set: `read`, `write`, `exec`, `search`, `task`, `bash_output`, `kill_shell`. Every tool call requires a `reason` field. File writes are atomic, so `/undo` is byte-exact. Ctrl-C cancels the in-flight turn — both the model stream and any running subprocess.
 
 There is no sandbox. Use Ctrl-C, `/undo`, and `git` as your guardrails.
 
 ## Why a separate repo
 
-axon is the runtime — a library that drives the agent loop and can host any agent personality. synapse is one such personality: opinionated for coding work in a terminal. Keeping them separate means:
+axon is the runtime — a library that drives the agent loop and can host any agent personality. cortex is one such personality: opinionated for coding work in a terminal. Keeping them separate means:
 
 - axon stays minimal and importable for other agents (reviewer, researcher, orchestrators).
-- synapse can ship binaries, slash commands, paste-aware input, and coding-specific defaults without bloating the library.
+- cortex can ship binaries, slash commands, paste-aware input, and coding-specific defaults without bloating the library.
 
 ## License
 

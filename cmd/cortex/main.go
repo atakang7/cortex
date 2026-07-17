@@ -1,4 +1,4 @@
-// Command synapse is a terminal coding agent built on the axon runtime.
+// Command cortex is a terminal coding agent built on the axon runtime.
 //
 // All runtime logic lives in github.com/atakang7/axon/agent. This binary
 // wires the runtime to a terminal: an interactive provider picker, a
@@ -8,7 +8,7 @@
 // If you want to embed the runtime from your own Go code (HTTP server,
 // orchestrator, alternate UI), import the agent package directly and
 // see https://github.com/atakang7/axon/tree/main/examples/minimal for
-// the minimum-viable embed. synapse is one product on top of axon.
+// the minimum-viable embed. cortex is one product on top of axon.
 package main
 
 import (
@@ -26,7 +26,7 @@ import (
 func main() {
 	var (
 		flagPrompt = flag.String("prompt", "", "Run a single prompt non-interactively and exit when the assistant emits a final reply. Requires LLM_PROVIDER env to be set to skip the provider picker.")
-		flagAgent  = flag.String("agent", "", "Named agent config to load from $SYNAPSE_AGENTS_DIR (default ~/.config/synapse/agents/<name>.yaml). Empty = built-in default coding agent.")
+		flagAgent  = flag.String("agent", "", "Named agent config to load from $CORTEX_AGENTS_DIR (default ~/.config/cortex/agents/<name>.yaml). Empty = built-in default coding agent.")
 	)
 	flag.Parse()
 
@@ -185,7 +185,7 @@ func main() {
 // --agent personality is supplied. The runtime itself has no default
 // prompt; if you're building a different product on top of the agent
 // package you should provide your own.
-const defaultCLIPrompt = `You are synapse, a terminal coding agent.
+const defaultCLIPrompt = `You are cortex, a terminal coding agent.
 
 You work in a real repository on the user's machine. The runtime gives
 you built-in tools: read, write, exec, search, task, bash_output,
