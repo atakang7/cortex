@@ -1,3 +1,18 @@
+## [2.0.0](https://github.com/atakang7/synapse/compare/v1.2.0...v2.0.0) (2026-07-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* module path is now github.com/atakang7/cortex, the
+binary is cortex, the agents dir is ~/.config/cortex/agents, and the
+SYNAPSE_AGENTS_DIR env var is now CORTEX_AGENTS_DIR.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+
+### Features
+
+* rename project from synapse to cortex ([d62f4b4](https://github.com/atakang7/synapse/commit/d62f4b4397969b379831394425db110575d37028))
+
 ## [1.2.0](https://github.com/atakang7/synapse/compare/v1.1.0...v1.2.0) (2026-06-07)
 
 
