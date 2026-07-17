@@ -6,7 +6,7 @@ axon ships the loop (streaming chat, tool dispatch, append-only session, seconda
 
 ```
 github.com/atakang7/axon/agent  ← runtime (signals)
-github.com/atakang7/cortex     ← coding agent (terminal of the axon)
+github.com/atakang7/cortex      ← coding agent (the layer axon feeds)
 ```
 
 ## Install
