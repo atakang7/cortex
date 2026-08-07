@@ -1,3 +1,10 @@
+## [2.0.1](https://github.com/atakang7/cortex/compare/v2.0.0...v2.0.1) (2026-08-07)
+
+
+### Bug Fixes
+
+* **ui:** add spinner to pruner and prevent pruner context deadline timeouts ([7254970](https://github.com/atakang7/cortex/commit/725497083490a9ab9a24f8c0645e36ac9e7855b4))
+
 ## [2.0.0](https://github.com/atakang7/synapse/compare/v1.2.0...v2.0.0) (2026-07-17)
 
 
