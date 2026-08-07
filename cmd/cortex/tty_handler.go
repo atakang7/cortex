@@ -485,8 +485,8 @@ func (h *ttyHandler) Handle(_ context.Context, e agent.Event) {
 		}
 		if e.Err != nil {
 			msg := e.Err.Error()
-			if strings.Contains(msg, "pruner: empty response") || strings.Contains(msg, "no JSON object in response") || strings.Contains(msg, "context deadline exceeded") {
-				// Suppress harmless pruner errors so they don't alarm the user
+			if strings.HasPrefix(msg, "pruner:") {
+				// Suppress all harmless pruner errors so they don't alarm the user
 				return
 			}
 			uiError(e.Err)
