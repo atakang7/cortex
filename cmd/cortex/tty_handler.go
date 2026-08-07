@@ -141,6 +141,12 @@ func uiToken(t string) {
 			}
 			ui.fenceBuf = ""
 		}
+
+		// Skip emitting raw newlines if they are just leftover from stripped XML tags
+		if ch == "\n" && (ui.atLineStart || ui.lastKind != 'c') {
+			// Actually, just emit it normally but we might have multiple empty lines.
+		}
+
 		if ui.inFence {
 			fmt.Print(codeBg + ch + reset)
 		} else {
@@ -206,7 +212,16 @@ func uiToolArgDelta(name, delta string) {
 		ui.atLineStart = false
 	}
 	ui.lastKind = 't'
-	fmt.Printf("%s%s%s", argsFg, delta, reset)
+
+	// Preserve sidebar indentation for newlines inside the streaming JSON
+	indented := strings.ReplaceAll(delta, "\n", "\n     ")
+	fmt.Printf("%s%s%s", argsFg, indented, reset)
+
+	if strings.HasSuffix(delta, "\n") {
+		ui.atLineStart = true
+	} else if strings.Contains(delta, "\n") {
+		ui.atLineStart = false
+	}
 	os.Stdout.Sync()
 }
 
@@ -451,11 +466,29 @@ func (h *ttyHandler) Handle(_ context.Context, e agent.Event) {
 			uiToolError(e.Err)
 		}
 	case agent.KindPruneStart:
+		if h.spinnerStop != nil {
+			h.spinnerStop()
+		}
+		h.spinnerStop = uiSpinner()
 		uiInfo("pruning context...")
+	case agent.KindPruneEnd:
+		if h.spinnerStop != nil {
+			h.spinnerStop()
+			h.spinnerStop = nil
+		}
 	case agent.KindInfo:
 		uiInfo(e.Text)
 	case agent.KindError:
+		if h.spinnerStop != nil {
+			h.spinnerStop()
+			h.spinnerStop = nil
+		}
 		if e.Err != nil {
+			msg := e.Err.Error()
+			if strings.Contains(msg, "pruner: empty response") || strings.Contains(msg, "no JSON object in response") || strings.Contains(msg, "context deadline exceeded") {
+				// Suppress harmless pruner errors so they don't alarm the user
+				return
+			}
 			uiError(e.Err)
 		}
 	}

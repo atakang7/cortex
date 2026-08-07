@@ -41,7 +41,7 @@ func main() {
 		uiSilent = true
 	}
 
-	providers, err := agent.LoadProviders()
+	providers, err := LoadProviders()
 	if err != nil {
 		uiError(err)
 		return
@@ -53,7 +53,7 @@ func main() {
 		mainKey string
 	)
 	if nonInteractive {
-		p, err = agent.ResolveProvider(providers)
+		p, err = ResolveProvider(providers)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "non-interactive mode requires LLM_PROVIDER:", err)
 			os.Exit(1)
@@ -73,7 +73,7 @@ func main() {
 		pruner         *agent.Pruner
 	)
 	if nonInteractive {
-		if sel := agent.EnvString("LLM_PRUNER_PROVIDER"); sel != "" && sel != "off" && sel != "none" {
+		if sel := EnvString("LLM_PRUNER_PROVIDER"); sel != "" && sel != "off" && sel != "none" {
 			prunerProvider, prunerKey, err = resolvePrunerInteractive(providers, lc.Pruner)
 			if err != nil {
 				uiError(err)
@@ -88,12 +88,20 @@ func main() {
 		}
 	}
 	if prunerKey != "" {
-		pc, err := agent.NewClient(prunerProvider)
+		pc, err := agent.OpenAI(agent.OpenAIConfig{Provider: prunerProvider, ExcludeReasoning: true})
 		if err != nil {
 			uiError(err)
 			return
 		}
-		pruner = agent.NewPruner(pc)
+		
+		dp := &dynamicPruner{base: pc}
+		if p, ok := providers["openrouter/nvidia/nemotron-3-ultra:free"]; ok {
+			dp.normal, _ = agent.OpenAI(agent.OpenAIConfig{Provider: p, ExcludeReasoning: true})
+		}
+		if p, ok := providers["openrouter/poolside/laguna-s-2.1:free"]; ok {
+			dp.heavy, _ = agent.OpenAI(agent.OpenAIConfig{Provider: p, ExcludeReasoning: true})
+		}
+		pruner = agent.NewPruner(dp)
 	}
 
 	if !nonInteractive {
@@ -117,8 +125,14 @@ func main() {
 
 	tty := newTTYHandler()
 
+	m, err := agent.OpenAI(agent.OpenAIConfig{Provider: p})
+	if err != nil {
+		uiError(err)
+		return
+	}
+
 	ag, err := agent.New(agent.Config{
-		Provider:     p,
+		Model:        m,
 		SystemPrompt: systemPrompt,
 		Tools:        customTools,
 		Pruner:       pruner,
@@ -197,3 +211,59 @@ Principles:
 - Atomic edits only. /undo is byte-exact; don't fight it.
 - Act, don't narrate.
 - Stop when the goal is met. Don't invent follow-up work.`
+
+type dynamicPruner struct {
+	base   agent.Model
+	normal agent.Model
+	heavy  agent.Model
+}
+
+func (d *dynamicPruner) Complete(ctx context.Context, req agent.Request) (*agent.Msg, error) {
+	tokens := 0
+	for _, m := range req.Messages {
+		tokens += len(m.Content)
+		for _, tc := range m.ToolCalls {
+			tokens += len(tc.Function.Arguments) + len(tc.Function.Name)
+		}
+	}
+	tokens /= 4
+
+	if tokens > 50000 && d.heavy != nil {
+		fmt.Println("\n\033[38;5;221m  ⚠  WARNING: Context > 50k tokens. Using biggest free model (laguna-s-2.1) to oversummarize. This may break some context history!\033[0m")
+		if len(req.Messages) > 0 && req.Messages[0].Role == "system" {
+			req.Messages[0].Content = oversummarizeSystemPrompt
+		}
+		msg, err := d.heavy.Complete(ctx, req)
+		if err == nil && msg != nil && msg.Content != "" {
+			return msg, nil
+		}
+	}
+	if tokens > 10000 && d.normal != nil {
+		msg, err := d.normal.Complete(ctx, req)
+		if err == nil && msg != nil && msg.Content != "" {
+			return msg, nil
+		}
+	}
+	if d.base != nil {
+		return d.base.Complete(ctx, req)
+	}
+	return nil, fmt.Errorf("no pruner model available")
+}
+
+const oversummarizeSystemPrompt = `You keep an agent's working memory small. The context has grown exceedingly large.
+
+You are shown the agent's task and a numbered log of what has happened. Decide
+which blocks it no longer needs in order to finish that task. You should be extremely aggressive and park as much as possible to save context space.
+
+Answer with one JSON object and nothing that matters after it:
+
+{"park":[3,7,9]}
+
+Block ids are the integers in the labels (m7 is 7).
+
+Never park:
+- a block naming a file the agent has edited or is editing
+- a block holding an unresolved error or a failing test
+
+Parking is one-way: the agent cannot get a parked block back.`
+

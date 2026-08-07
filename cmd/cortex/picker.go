@@ -22,7 +22,7 @@ type lastChoice struct {
 }
 
 func lastChoicePath() string {
-	return filepath.Join(agent.DataDir(), "last_choice.json")
+	return filepath.Join(DataDir(), "last_choice.json")
 }
 
 func loadLastChoice() lastChoice {
@@ -36,7 +36,7 @@ func loadLastChoice() lastChoice {
 }
 
 func saveLastChoice(lc lastChoice) {
-	_ = os.MkdirAll(agent.DataDir(), 0755)
+	_ = os.MkdirAll(DataDir(), 0755)
 	data, err := json.MarshalIndent(lc, "", "  ")
 	if err != nil {
 		return
@@ -46,10 +46,10 @@ func saveLastChoice(lc lastChoice) {
 
 // pickProvider prints the available providers and reads a choice from stdin.
 func pickProvider(role, defaultKey string, providers map[string]agent.Provider, allowNone bool) string {
-	keys := agent.ProviderNames(providers)
+	keys := ProviderNames(providers)
 	if len(keys) == 0 {
 		if !allowNone {
-			fmt.Fprintln(os.Stderr, "no providers configured; create "+agent.ProvidersPath())
+			fmt.Fprintln(os.Stderr, "no providers configured; create "+ProvidersPath())
 			os.Exit(1)
 		}
 		return ""
@@ -102,36 +102,36 @@ func pickProvider(role, defaultKey string, providers map[string]agent.Provider, 
 }
 
 func resolveProviderInteractive(providers map[string]agent.Provider, defaultKey string) (agent.Provider, string, error) {
-	if p, err := agent.ResolveProvider(providers); err == nil {
+	if p, err := ResolveProvider(providers); err == nil {
 		key := canonicalKey(providers, p)
 		return p, key, nil
-	} else if !errors.Is(err, agent.ErrAmbiguousProvider) {
+	} else if !errors.Is(err, ErrAmbiguousProvider) {
 		return agent.Provider{}, "", err
 	}
 	key := pickProvider("main agent", defaultKey, providers, false)
 	if key == "" {
 		return agent.Provider{}, "", fmt.Errorf("no main agent selected")
 	}
-	p, err := agent.ApplyProviderEnvOverrides(providers[key])
+	p, err := ApplyEnvOverrides(providers[key])
 	return p, key, err
 }
 
 func resolvePrunerInteractive(providers map[string]agent.Provider, defaultKey string) (agent.Provider, string, error) {
-	if sel := strings.TrimSpace(agent.EnvString("LLM_PRUNER_PROVIDER")); sel != "" {
+	if sel := strings.TrimSpace(EnvString("LLM_PRUNER_PROVIDER")); sel != "" {
 		if sel == "off" || sel == "none" {
 			return agent.Provider{}, "", nil
 		}
 		if p, ok := providers[strings.ToLower(sel)]; ok {
-			pp, err := agent.ApplyProviderEnvOverrides(p)
+			pp, err := ApplyEnvOverrides(p)
 			return pp, strings.ToLower(sel), err
 		}
-		return agent.Provider{}, "", fmt.Errorf("LLM_PRUNER_PROVIDER=%q not found in %s", sel, agent.ProvidersPath())
+		return agent.Provider{}, "", fmt.Errorf("LLM_PRUNER_PROVIDER=%q not found in %s", sel, ProvidersPath())
 	}
 	key := pickProvider("pruner (cleans context when it grows)", defaultKey, providers, true)
 	if key == "" {
 		return agent.Provider{}, "", nil
 	}
-	p, err := agent.ApplyProviderEnvOverrides(providers[key])
+	p, err := ApplyEnvOverrides(providers[key])
 	return p, key, err
 }
 
