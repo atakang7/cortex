@@ -1,3 +1,10 @@
+## [2.0.2](https://github.com/atakang7/cortex/compare/v2.0.1...v2.0.2) (2026-08-07)
+
+
+### Bug Fixes
+
+* **ui:** suppress all pruner errors gracefully ([789d531](https://github.com/atakang7/cortex/commit/789d5313bc6c73f4f581fef93c571e7ae988aa52))
+
 ## [2.0.1](https://github.com/atakang7/cortex/compare/v2.0.0...v2.0.1) (2026-08-07)
 
 
