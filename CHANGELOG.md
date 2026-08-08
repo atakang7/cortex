@@ -1,3 +1,10 @@
+## [2.1.0](https://github.com/atakang7/cortex/compare/v2.0.4...v2.1.0) (2026-08-08)
+
+
+### Features
+
+* adopt native axon MCP integration ([ff6339f](https://github.com/atakang7/cortex/commit/ff6339feb08f38a272fb242d58e0e1cd87824cdb))
+
 ## [2.0.4](https://github.com/atakang7/cortex/compare/v2.0.3...v2.0.4) (2026-08-08)
 
 
