@@ -1,3 +1,10 @@
+## [2.1.3](https://github.com/atakang7/cortex/compare/v2.1.2...v2.1.3) (2026-08-08)
+
+
+### Bug Fixes
+
+* require yaml config for model declaration ([a365f98](https://github.com/atakang7/cortex/commit/a365f9832df56e6e324186d93ba59f635c9c8992))
+
 ## [2.1.2](https://github.com/atakang7/cortex/compare/v2.1.1...v2.1.2) (2026-08-08)
 
 
