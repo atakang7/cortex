@@ -121,7 +121,7 @@ func translate(e axon.Event) tea.Msg {
 		if e.Prune == nil {
 			return nil
 		}
-		return pruneEndMsg{Before: e.Prune.Before, After: e.Prune.After}
+		return pruneEndMsg{Before: e.Prune.Before, After: e.Prune.After, Rejected: e.Prune.Rejected}
 
 	case axon.KindInfo:
 		return noticeMsg(e.Text)
@@ -182,8 +182,6 @@ type toolErrorMsg struct {
 	Err  error
 }
 
-
-
 // noticeMsg is runtime chatter worth showing but not worth alarm — a retry
 // notice, for instance.
 type noticeMsg string
@@ -204,6 +202,11 @@ type pruneStartMsg struct {
 type pruneEndMsg struct {
 	Before int
 	After  int
+
+	// Rejected lists block ids the curator named that could not be parked.
+	// Not a failure — the pass parked everything it legitimately could — but
+	// a steady stream of them means the curator is inventing ids.
+	Rejected []string
 }
 
 // turnDoneMsg reports that Step returned. It is produced by the command that
