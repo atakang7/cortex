@@ -117,11 +117,17 @@ func main() {
 			fmt.Fprintln(os.Stderr, "warning: agent system_prompt:", err)
 		}
 	}
-	customTools, err := agentCfg.BuildTools()
-	if err != nil {
-		uiError(err)
-		return
+	var customTools []axon.Tool
+	var mcpServers []axon.MCPServer
+
+	if agentCfg != nil {
+		customTools, mcpServers, err = agentCfg.BuildTools()
+		if err != nil {
+			uiError(err)
+			return
+		}
 	}
+
 
 	tty := newTTYHandler()
 
@@ -135,6 +141,7 @@ func main() {
 		Model:        m,
 		SystemPrompt: systemPrompt,
 		Tools:        customTools,
+		MCPServers:   mcpServers,
 		Pruner:       pruner,
 		OnEvent:      tty.Handle,
 	})

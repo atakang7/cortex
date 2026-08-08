@@ -41,9 +41,17 @@ type AgentConfig struct {
 	Description        string       `yaml:"description,omitempty"`
 	SystemPrompt       string       `yaml:"system_prompt,omitempty"`
 	SystemPromptInline string       `yaml:"system_prompt_inline,omitempty"`
-	Tools              []ToolConfig `yaml:"tools,omitempty"`
+	Tools              []ToolConfig          `yaml:"tools,omitempty"`
+	MCPServers         map[string]MCPConfig  `yaml:"mcp_servers,omitempty"`
 
 	sourcePath string `yaml:"-"`
+}
+
+// MCPConfig is one MCP server definition.
+type MCPConfig struct {
+	Command string   `yaml:"command"`
+	Args    []string `yaml:"args,omitempty"`
+	Env     []string `yaml:"env,omitempty"`
 }
 
 // ToolConfig is one custom tool definition.
@@ -123,10 +131,14 @@ func (c *AgentConfig) validate() error {
 			if strings.TrimSpace(t.Command) == "" {
 				return fmt.Errorf("tools[%d] %q: shell tools require a command", i, t.Name)
 			}
-		case "mcp":
-			return fmt.Errorf("tools[%d] %q: type=mcp is reserved but not yet implemented", i, t.Name)
 		default:
 			return fmt.Errorf("tools[%d] %q: unknown type %q (expected: shell)", i, t.Name, t.Type)
+		}
+	}
+	
+	for name, mc := range c.MCPServers {
+		if strings.TrimSpace(mc.Command) == "" {
+			return fmt.Errorf("mcp_servers[%q]: command is required", name)
 		}
 	}
 	return nil
@@ -150,14 +162,24 @@ func (c *AgentConfig) LoadSystemPrompt() (string, error) {
 
 // BuildTools materializes the YAML tool list as runtime tools (shell
 // templates rendered into axon.Tool values).
-func (c *AgentConfig) BuildTools() ([]axon.Tool, error) {
+func (c *AgentConfig) BuildTools() ([]axon.Tool, []axon.MCPServer, error) {
 	var tools []axon.Tool
 	for _, tc := range c.Tools {
 		t, err := buildCustomTool(tc)
 		if err != nil {
-			return nil, fmt.Errorf("custom tool %q: %w", tc.Name, err)
+			return nil, nil, fmt.Errorf("custom tool %q: %w", tc.Name, err)
 		}
 		tools = append(tools, t)
 	}
-	return tools, nil
+	
+	var mcpServers []axon.MCPServer
+	for _, mc := range c.MCPServers {
+		mcpServers = append(mcpServers, axon.MCPServer{
+			Command: mc.Command,
+			Args:    mc.Args,
+			Env:     mc.Env,
+		})
+	}
+	
+	return tools, mcpServers, nil
 }
