@@ -1,241 +1,186 @@
+// Command cortex is a terminal coding agent built on the axon runtime.
+//
+// axon owns the loop: streaming the model, dispatching tools, persisting an
+// append-only session, and pruning context under pressure. cortex owns the
+// product around it — resolving which model to talk to, the role text that
+// makes it a coding agent, and the terminal it talks through.
+//
+// This file is wiring and nothing else. Every decision it makes is delegated:
+// configuration to internal/config, presentation to internal/ui, and the loop
+// itself to axon. If logic accumulates here, it belongs in one of those.
 package main
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"os/signal"
-
-	"strings"
 	"syscall"
 
 	"github.com/atakang7/axon"
-	"github.com/chzyer/readline"
-	"gopkg.in/yaml.v3"
-)
 
-// AgentConfig represents the declarative YAML configuration for the agent.
-type AgentConfig struct {
-	Name         string            `yaml:"name"`
-	Model        ModelConfig       `yaml:"model"`
-	SystemPrompt string            `yaml:"system_prompt"`
-	MCPServers   map[string]MCPSrv `yaml:"mcp_servers"`
-}
-
-type ModelConfig struct {
-	Provider string `yaml:"provider"`
-	Name     string `yaml:"name"`
-	BaseURL  string `yaml:"base_url"`
-	APIKey   string `yaml:"api_key"` // can be an env var name like $OPENAI_API_KEY
-}
-
-type MCPSrv struct {
-	Command string   `yaml:"command"`
-	Args    []string `yaml:"args"`
-	Env     []string `yaml:"env"`
-}
-
-// UI colors
-const (
-	reset  = "\033[0m"
-	brand  = "\033[38;5;215m"
-	mute   = "\033[38;5;243m"
-	bad    = "\033[38;5;203m"
-	toolFg = "\033[38;5;110m"
-	think  = "\033[38;5;245m"
+	"github.com/atakang7/cortex/internal/config"
+	"github.com/atakang7/cortex/internal/ui"
 )
 
 func main() {
+	if err := run(); err != nil {
+		fmt.Fprintf(os.Stderr, "cortex: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+// Build metadata, injected at link time by goreleaser.
+//
+// DEPLOYMENT COUPLING: the names of these three variables are written into
+// the ldflags in .goreleaser.yaml. Renaming one here does not break the
+// build — the linker ignores a -X for a symbol that does not exist — it just
+// silently stops being set. Change both files together.
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
+
+func run() error {
 	var (
-		flagConfig = flag.String("config", "", "Path to cortex.yaml config file")
-		flagPrompt = flag.String("prompt", "", "Run a single prompt non-interactively")
+		configPath  = flag.String("config", "", "path to a config file, instead of the usual cascade")
+		prompt      = flag.String("prompt", "", "run one prompt non-interactively and exit")
+		showVersion = flag.Bool("version", false, "print the version and exit")
 	)
 	flag.Parse()
 
-	// 1. Load Configuration
-	configFile := *flagConfig
-	if configFile == "" {
-		configFile = "cortex.yaml"
+	if *showVersion {
+		fmt.Printf("cortex %s (%s, built %s)\n", version, commit, date)
+
+		return nil
 	}
 
-	var cfg AgentConfig
-	data, err := os.ReadFile(configFile)
+	cfg, err := config.Load(*configPath)
 	if err != nil {
-		if *flagConfig != "" {
-			fmt.Printf("Config error: %v\n", err)
-			os.Exit(1)
+		if errors.Is(err, config.ErrNoModel) {
+			return errors.New(onboarding)
 		}
-		// Graceful default if no cortex.yaml exists
-		cfg = AgentConfig{
-			Name: "default",
-			SystemPrompt: "You are cortex, a minimal and highly capable terminal coding agent.\n\nPrinciples:\n- Read before you write. Search before you read.\n- One change per turn. Verify with exec.\n- Atomic edits only. /undo is byte-exact; don't fight it.\n- Act, don't narrate.\n- Stop when the goal is met.",
-			Model: ModelConfig{
-				Provider: "openai",
-				Name:     "gpt-4o",
-				APIKey:   "$OPENAI_API_KEY",
-			},
-		}
-	} else {
-		if err := yaml.Unmarshal(data, &cfg); err != nil {
-			fmt.Printf("Config parse error: %v\n", err)
-			os.Exit(1)
-		}
+
+		return err
 	}
 
-	if cfg.Model.Name == "" {
-		fmt.Println("Error: model configuration is required in your config file.")
-		os.Exit(1)
+	// axon owns providers, credentials and every runtime knob. cortex's
+	// config says which provider and model to use; axon's says where they
+	// live and how they are authenticated.
+	settings, err := axon.Load()
+	if err != nil {
+		if errors.Is(err, axon.ErrMissingConfig) || errors.Is(err, axon.ErrMissingEnv) {
+			return fmt.Errorf("%w\n\n%s", err, axonSetup)
+		}
+
+		return err
 	}
 
-	// Resolve API Key (allow $ENV_VAR syntax in config)
-	apiKey := cfg.Model.APIKey
-	if strings.HasPrefix(apiKey, "$") {
-		apiKey = os.Getenv(strings.TrimPrefix(apiKey, "$"))
-	}
-	if apiKey == "" {
-		fmt.Println("Error: API Key is required. Set it in the config or via the environment variable.")
-		os.Exit(1)
+	model, err := settings.NewClient(cfg.Provider, cfg.ModelName)
+	if err != nil {
+		return err
 	}
 
-	model, err := axon.NewClient(axon.ClientConfig{
-		Provider: axon.Provider{
-			Name:    cfg.Model.Provider,
-			Model:   cfg.Model.Name,
-			APIKey:  apiKey,
-			BaseURL: cfg.Model.BaseURL,
-		},
+	if *prompt != "" {
+		return runOnce(cfg, settings, model, *prompt)
+	}
+
+	return runInteractive(cfg, settings, model)
+}
+
+// runInteractive starts the full terminal UI.
+//
+// Interrupt is deliberately absent from the signal set: in raw mode Ctrl-C
+// arrives as a key, and the UI binds it to cancelling the turn rather than
+// killing the process. Only a signal the terminal cannot deliver as a
+// keystroke should end the program from outside.
+func runInteractive(cfg config.Config, settings axon.Settings, model axon.Model) error {
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGHUP)
+	defer stop()
+
+	bridge := &ui.Bridge{}
+
+	agent, err := newAgent(cfg, settings, model, bridge.Emit)
+	if err != nil {
+		return err
+	}
+	defer agent.Close()
+
+	return ui.Run(ctx, bridge, ui.Options{
+		Agent:     agent,
+		Context:   ctx,
+		ModelName: cfg.ModelName,
+		AgentName: cfg.Name,
 	})
+}
+
+// runOnce drives a single turn with no TUI. Ctrl-C ends the process here,
+// which is the ordinary expectation for a one-shot command.
+func runOnce(cfg config.Config, settings axon.Settings, model axon.Model, prompt string) error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	renderer := ui.NewPlain(os.Stdout, os.Stderr)
+	defer renderer.Close()
+
+	agent, err := newAgent(cfg, settings, model, renderer.Emit)
 	if err != nil {
-		fmt.Printf("Model error: %v\n", err)
-		os.Exit(1)
+		return err
+	}
+	defer agent.Close()
+
+	if _, err := agent.Step(ctx, prompt); err != nil {
+		if errors.Is(err, axon.ErrInterrupted) || errors.Is(err, context.Canceled) {
+			return nil
+		}
+
+		return err
 	}
 
-	// Map MCP servers
-	var mcpServers []axon.MCPServer
-	for _, mcp := range cfg.MCPServers {
-		mcpServers = append(mcpServers, axon.MCPServer{
-			Command: mcp.Command,
-			Args:    mcp.Args,
-			Env:     mcp.Env,
-		})
+	return nil
+}
+
+// newAgent constructs the runtime. Both modes go through here so they cannot
+// drift into configuring the agent differently.
+func newAgent(cfg config.Config, settings axon.Settings, model axon.Model, onEvent func(context.Context, axon.Event)) (*axon.Agent, error) {
+	servers := make([]axon.MCPServer, 0, len(cfg.MCPServers))
+	for _, s := range cfg.MCPServers {
+		servers = append(servers, axon.MCPServer{Command: s.Command, Args: s.Args, Env: s.Env})
 	}
 
-	// 3. Initialize Engine
-	ag, err := axon.New(axon.Config{
+	return axon.New(axon.Config{
 		Model:        model,
 		SystemPrompt: cfg.SystemPrompt,
-		MCPServers:   mcpServers,
-		OnEvent:      handleEvent,
+		MCPServers:   servers,
+		OnEvent:      onEvent,
+		Settings:     settings,
 	})
-	if err != nil {
-		fmt.Printf("Agent init error: %v\n", err)
-		os.Exit(1)
-	}
-	defer ag.Close()
-
-	fmt.Printf("\n%s cortex%s · %s%s%s\n\n", brand, reset, mute, cfg.Model.Name, reset)
-
-	// 4. Non-Interactive Mode
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGHUP, os.Interrupt)
-	defer cancel()
-
-	if *flagPrompt != "" {
-		if _, err := ag.Step(ctx, *flagPrompt); err != nil {
-			fmt.Printf("\n%sError: %v%s\n", bad, err, reset)
-		}
-		return
-	}
-
-	// 5. Interactive REPL Loop
-	rl, err := readline.NewEx(&readline.Config{
-		Prompt:          fmt.Sprintf("%s❯%s ", brand, reset),
-		InterruptPrompt: "^C",
-		EOFPrompt:       "exit",
-	})
-	if err != nil {
-		panic(err)
-	}
-	defer rl.Close()
-
-	for {
-		line, err := rl.Readline()
-		if err != nil {
-			break // EOF or Ctrl-D
-		}
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-
-		// Handle slash commands
-		if strings.HasPrefix(line, "/cd ") {
-			if cwd, err := ag.Cd(strings.TrimPrefix(line, "/cd ")); err == nil {
-				fmt.Printf("%scwd: %s%s\n", mute, cwd, reset)
-			} else {
-				fmt.Printf("%sError: %v%s\n", bad, err, reset)
-			}
-			continue
-		}
-		if line == "/undo" {
-			if p, ok := ag.Undo(); ok {
-				fmt.Printf("%sundone: %s%s\n", mute, p, reset)
-			} else {
-				fmt.Printf("%snothing to undo%s\n", mute, reset)
-			}
-			continue
-		}
-		if line == "/new" {
-			ag.Reset()
-			fmt.Printf("%snew session started%s\n", mute, reset)
-			continue
-		}
-
-		// Execute turn
-		if _, err := ag.Step(ctx, line); err != nil {
-			fmt.Printf("\n%sError: %v%s\n", bad, err, reset)
-		}
-		fmt.Println()
-	}
 }
 
-// handleEvent formats Axon runtime events for the terminal.
-func handleEvent(_ context.Context, e axon.Event) {
-	switch e.Kind {
-	case axon.KindToken:
-		fmt.Print(e.Text)
-		os.Stdout.Sync()
-	case axon.KindReasoning:
-		fmt.Printf("%s%s%s", think, e.Text, reset)
-		os.Stdout.Sync()
-	case axon.KindToolCall:
-		if e.Tool != nil {
-			fmt.Printf("\n%s  ⎿  %s%s\n", mute, toolFg+e.Tool.Name, reset)
-			// Pretty print arguments
-			var raw map[string]any
-			if json.Unmarshal([]byte(e.Tool.Args), &raw) == nil {
-				if b, err := json.MarshalIndent(raw, "     ", "  "); err == nil {
-					fmt.Printf("%s     %s%s\n", mute, string(b), reset)
-				}
-			}
-		}
-	case axon.KindToolResult:
-		if e.Tool != nil {
-			lines := strings.Split(strings.TrimSpace(e.Tool.Result), "\n")
-			for _, l := range lines {
-				fmt.Printf("%s     │ %s%s\n", mute, l, reset)
-			}
-		}
-	case axon.KindToolError:
-		if e.Err != nil {
-			fmt.Printf("%s  ✗  %v%s\n", bad, e.Err, reset)
-		}
-	case axon.KindInfo:
-		fmt.Printf("%s  %s%s\n", mute, e.Text, reset)
-	case axon.KindError:
-		if e.Err != nil && !strings.HasPrefix(e.Err.Error(), "pruner:") {
-			fmt.Printf("\n%s  ✗  %v%s\n", bad, e.Err, reset)
-		}
-	}
-}
+// onboarding is what a first run with nothing configured prints.
+const onboarding = `no model configured
+
+Write ~/.config/cortex/config.yaml:
+
+    provider: openrouter
+    model: deepseek/deepseek-v3.2
+
+A ./cortex.yaml in the working directory overrides the user config, and
+LLM_PROVIDER / LLM_MODEL override both.
+
+Providers and credentials are configured in axon:
+
+    See https://github.com/atakang7/axon#configuration`
+
+// axonSetup tells the user how to set up axon when its config is missing.
+const axonSetup = `cortex needs axon configured first.
+
+    mkdir -p ~/.config/axon
+    # Copy axon.example.yaml from the axon repo to ~/.config/axon/axon.yaml
+    printf 'OPENROUTER_API_KEY=sk-or-...\n' > ~/.config/axon/.env
+    chmod 600 ~/.config/axon/.env
+
+See https://github.com/atakang7/axon#configuration`
