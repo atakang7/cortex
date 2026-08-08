@@ -101,7 +101,7 @@ func main() {
 		if p, ok := providers["openrouter/poolside/laguna-s-2.1:free"]; ok {
 			dp.heavy, _ = agent.OpenAI(agent.OpenAIConfig{Provider: p, ExcludeReasoning: true})
 		}
-		pruner = agent.NewPruner(dp)
+		pruner = agent.NewPruner(agent.PrunerConfig{Model: dp})
 	}
 
 	if !nonInteractive {
