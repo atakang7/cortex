@@ -1,3 +1,10 @@
+## [2.0.4](https://github.com/atakang7/cortex/compare/v2.0.3...v2.0.4) (2026-08-08)
+
+
+### Refactoring
+
+* update to use flattened axon package ([47df729](https://github.com/atakang7/cortex/commit/47df7298fffa5dd2ae27a2576a9901da4a5a34e6))
+
 ## [2.0.3](https://github.com/atakang7/cortex/compare/v2.0.2...v2.0.3) (2026-08-08)
 
 
