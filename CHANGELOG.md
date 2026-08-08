@@ -1,3 +1,10 @@
+## [2.0.3](https://github.com/atakang7/cortex/compare/v2.0.2...v2.0.3) (2026-08-08)
+
+
+### Bug Fixes
+
+* update NewPruner usage to use PrunerConfig ([abd3ee4](https://github.com/atakang7/cortex/commit/abd3ee4e3727cf2dd06cc4eddbcc13884dd7ebc0))
+
 ## [2.0.2](https://github.com/atakang7/cortex/compare/v2.0.1...v2.0.2) (2026-08-07)
 
 
