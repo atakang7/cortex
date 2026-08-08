@@ -1,3 +1,10 @@
+## [2.1.1](https://github.com/atakang7/cortex/compare/v2.1.0...v2.1.1) (2026-08-08)
+
+
+### Refactoring
+
+* replace custom input buffering with chzyer/readline ([22e2ff5](https://github.com/atakang7/cortex/commit/22e2ff50c9c6c4608205a3a0b6da6f64e2aa76eb))
+
 ## [2.1.0](https://github.com/atakang7/cortex/compare/v2.0.4...v2.1.0) (2026-08-08)
 
 
