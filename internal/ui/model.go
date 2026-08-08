@@ -112,9 +112,9 @@ func New(opts Options) Model {
 		modelName:  opts.ModelName,
 		prunerName: opts.PrunerName,
 		agentName:  opts.AgentName,
-		input:     newInput(),
-		spinner:   newSpinner(),
-		settings:  opts.Settings,
+		input:      newInput(),
+		spinner:    newSpinner(),
+		settings:   opts.Settings,
 	}
 
 	var items []list.Item
@@ -355,8 +355,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Println(renderPruner(fmt.Sprintf("pruning context (%s tokens)...", compactCount(msg.Before)), m.width))
 
 	case pruneEndMsg:
-		return m, tea.Println(renderPruner(fmt.Sprintf("context pruned · %s → %s tokens",
-			compactCount(msg.Before), compactCount(msg.After)), m.width))
+		text := fmt.Sprintf("context pruned · %s → %s tokens",
+			compactCount(msg.Before), compactCount(msg.After))
+		// The curator naming a block it could not park is a note about the
+		// curator, not a failed pass — the arrow above already says what the
+		// pass achieved.
+		if n := len(msg.Rejected); n > 0 {
+			text += fmt.Sprintf(" · ignored %d invented id(s): %s",
+				n, strings.Join(msg.Rejected, ", "))
+		}
+		return m, tea.Println(renderPruner(text, m.width))
 
 	case noticeMsg:
 		return m, tea.Println(renderNotice(string(msg), m.width))
