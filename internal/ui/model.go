@@ -69,9 +69,10 @@ type Model struct {
 	spinner spinner.Model
 	width   int
 
-	settings     axon.Settings
-	picker       list.Model
-	pickingModel bool
+	settings      axon.Settings
+	picker        list.Model
+	pickingModel  bool
+	pickingPruner bool
 
 	// busy is true from submitting a turn until Step returns. It gates input
 	// and drives the spinner.
@@ -185,25 +186,34 @@ func (m Model) Init() tea.Cmd {
 // Update is the single place UI state changes. It is organised by where a
 // message came from: the terminal, the runtime, or the turn command.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if m.pickingModel {
+	if m.pickingModel || m.pickingPruner {
 		var cmd tea.Cmd
 		switch msg := msg.(type) {
 		case tea.KeyMsg:
 			if msg.Type == tea.KeyEsc {
 				m.pickingModel = false
+				m.pickingPruner = false
 				return m, nil
 			}
 			if msg.Type == tea.KeyEnter {
 				i, ok := m.picker.SelectedItem().(modelItem)
+				notice := ""
 				if ok {
-					m.modelName = i.model
 					newModel, err := m.settings.NewClient(i.provider, i.model)
 					if err == nil {
-						m.agent.SetModel(newModel)
+						if m.pickingPruner {
+							m.agent.SetPrunerModel(newModel)
+							notice = "pruner changed to " + i.model
+						} else {
+							m.agent.SetModel(newModel)
+							m.modelName = i.model
+							notice = "model changed to " + i.model
+						}
 					}
 				}
 				m.pickingModel = false
-				return m, tea.Println(renderNotice("model changed to "+m.modelName, m.width))
+				m.pickingPruner = false
+				return m, tea.Println(renderNotice(notice, m.width))
 			}
 		case tea.WindowSizeMsg:
 			m.picker.SetWidth(msg.Width)
@@ -266,7 +276,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// ----- runtime chatter -------------------------------------------------
 
-	case pruneMsg:
+	case pruneStartMsg:
+		return m, tea.Println(renderNotice(fmt.Sprintf("pruning context (%s tokens)...", compactCount(msg.Before)), m.width))
+
+	case pruneEndMsg:
 		return m, tea.Println(renderNotice(fmt.Sprintf("context pruned · %s → %s tokens",
 			compactCount(msg.Before), compactCount(msg.After)), m.width))
 
@@ -417,6 +430,13 @@ func (m Model) applyCommand(res commandResult) (tea.Model, tea.Cmd) {
 
 	if res.SelectModel {
 		m.pickingModel = true
+		m.picker.Title = "Select Model"
+		return m, nil
+	}
+
+	if res.SelectPruner {
+		m.pickingPruner = true
+		m.picker.Title = "Select Pruner"
 		return m, nil
 	}
 

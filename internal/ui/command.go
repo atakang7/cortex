@@ -34,6 +34,9 @@ type commandResult struct {
 
 	// SelectModel tells the UI to open the model selection list.
 	SelectModel bool
+
+	// SelectPruner tells the UI to open the pruner model selection list.
+	SelectPruner bool
 }
 
 // command is one slash command.
@@ -124,6 +127,14 @@ var commands = map[string]command{
 		Help: "select a different model for this session",
 		Run: func(*axon.Agent, string) commandResult {
 			return commandResult{SelectModel: true}
+		},
+	},
+
+	"/pruner": {
+		Name: "/pruner",
+		Help: "select a different pruner model for this session",
+		Run: func(*axon.Agent, string) commandResult {
+			return commandResult{SelectPruner: true}
 		},
 	},
 

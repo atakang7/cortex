@@ -84,11 +84,17 @@ func translate(e axon.Event) tea.Msg {
 		}
 		return toolErrorMsg{ID: e.Tool.ID, Name: e.Tool.Name, Err: e.Err}
 
+	case axon.KindPruneStart:
+		if e.Prune == nil {
+			return nil
+		}
+		return pruneStartMsg{Before: e.Prune.Before}
+
 	case axon.KindPruneEnd:
 		if e.Prune == nil {
 			return nil
 		}
-		return pruneMsg{Before: e.Prune.Before, After: e.Prune.After}
+		return pruneEndMsg{Before: e.Prune.Before, After: e.Prune.After}
 
 	case axon.KindInfo:
 		return noticeMsg(e.Text)
@@ -139,11 +145,7 @@ type toolErrorMsg struct {
 	Err  error
 }
 
-// pruneMsg reports that the context curator parked some history.
-type pruneMsg struct {
-	Before int
-	After  int
-}
+
 
 // noticeMsg is runtime chatter worth showing but not worth alarm — a retry
 // notice, for instance.
@@ -154,6 +156,17 @@ type noticeMsg string
 type runtimeErrorMsg struct {
 	Err  error
 	Text string
+}
+
+// pruneStartMsg signals the curator is looking at the context.
+type pruneStartMsg struct {
+	Before int
+}
+
+// pruneEndMsg signals the curator has parked stale context.
+type pruneEndMsg struct {
+	Before int
+	After  int
 }
 
 // turnDoneMsg reports that Step returned. It is produced by the command that
