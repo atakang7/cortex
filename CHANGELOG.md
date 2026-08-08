@@ -1,3 +1,10 @@
+## [2.2.0](https://github.com/atakang7/cortex/compare/v2.1.5...v2.2.0) (2026-08-08)
+
+
+### Features
+
+* add pruner support to cortex configuration ([ba799cc](https://github.com/atakang7/cortex/commit/ba799cc84d9f5a69e6f35e8d4a58d81044874265))
+
 ## [2.1.5](https://github.com/atakang7/cortex/compare/v2.1.4...v2.1.5) (2026-08-08)
 
 
