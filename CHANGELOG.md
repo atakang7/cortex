@@ -1,3 +1,10 @@
+## [2.2.1](https://github.com/atakang7/cortex/compare/v2.2.0...v2.2.1) (2026-08-08)
+
+
+### Bug Fixes
+
+* pass prunerModel instead of constructing pruner locally ([8d1bd15](https://github.com/atakang7/cortex/commit/8d1bd15f76dbb432218f36d8aa3c8dc9855f7e6c))
+
 ## [2.2.0](https://github.com/atakang7/cortex/compare/v2.1.5...v2.2.0) (2026-08-08)
 
 
