@@ -1,3 +1,11 @@
+## [2.5.0](https://github.com/atakang7/cortex/compare/v2.4.0...v2.5.0) (2026-08-08)
+
+
+### Features
+
+* add a raw event trace log ([734f157](https://github.com/atakang7/cortex/commit/734f1577312c65614912934da20d564fa15a2c54))
+* **ui:** surface pruner activity, differentiate speakers by color, fix stalled elapsed timer ([33ac1ab](https://github.com/atakang7/cortex/commit/33ac1ab6027545210c0373869cb91d5dad4aa07b))
+
 ## [2.4.0](https://github.com/atakang7/cortex/compare/v2.3.0...v2.4.0) (2026-08-08)
 
 
