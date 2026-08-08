@@ -1,3 +1,10 @@
+## [2.1.4](https://github.com/atakang7/cortex/compare/v2.1.3...v2.1.4) (2026-08-08)
+
+
+### Bug Fixes
+
+* add graceful default agent config fallback ([40dddcd](https://github.com/atakang7/cortex/commit/40dddcda2d2b0143968bd2197ed82200277cc286))
+
 ## [2.1.3](https://github.com/atakang7/cortex/compare/v2.1.2...v2.1.3) (2026-08-08)
 
 
