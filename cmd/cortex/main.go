@@ -86,29 +86,25 @@ func run() error {
 
 	// A pruner is optional. When configured, it runs a cheap secondary model
 	// that parks stale context so the main model stays under its window.
-	var pruner *axon.Pruner
+	var prunerModel axon.Model
 	if cfg.Pruner.Model != "" {
 		prunerProvider := cfg.Pruner.Provider
 		if prunerProvider == "" {
 			prunerProvider = cfg.Provider
 		}
 
-		prunerModel, err := settings.NewClient(prunerProvider, cfg.Pruner.Model)
+		pm, err := settings.NewClient(prunerProvider, cfg.Pruner.Model)
 		if err != nil {
 			return fmt.Errorf("pruner: %w", err)
 		}
-
-		pruner = axon.NewPruner(axon.PrunerConfig{
-			Model:    prunerModel,
-			Settings: settings.Pruner,
-		})
+		prunerModel = pm
 	}
 
 	if *prompt != "" {
-		return runOnce(cfg, settings, model, pruner, *prompt)
+		return runOnce(cfg, settings, model, prunerModel, *prompt)
 	}
 
-	return runInteractive(cfg, settings, model, pruner)
+	return runInteractive(cfg, settings, model, prunerModel)
 }
 
 // runInteractive starts the full terminal UI.
@@ -117,13 +113,13 @@ func run() error {
 // arrives as a key, and the UI binds it to cancelling the turn rather than
 // killing the process. Only a signal the terminal cannot deliver as a
 // keystroke should end the program from outside.
-func runInteractive(cfg config.Config, settings axon.Settings, model axon.Model, pruner *axon.Pruner) error {
+func runInteractive(cfg config.Config, settings axon.Settings, model axon.Model, prunerModel axon.Model) error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGHUP)
 	defer stop()
 
 	bridge := &ui.Bridge{}
 
-	agent, err := newAgent(cfg, settings, model, pruner, bridge.Emit)
+	agent, err := newAgent(cfg, settings, model, prunerModel, bridge.Emit)
 	if err != nil {
 		return err
 	}
@@ -139,14 +135,14 @@ func runInteractive(cfg config.Config, settings axon.Settings, model axon.Model,
 
 // runOnce drives a single turn with no TUI. Ctrl-C ends the process here,
 // which is the ordinary expectation for a one-shot command.
-func runOnce(cfg config.Config, settings axon.Settings, model axon.Model, pruner *axon.Pruner, prompt string) error {
+func runOnce(cfg config.Config, settings axon.Settings, model axon.Model, prunerModel axon.Model, prompt string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	renderer := ui.NewPlain(os.Stdout, os.Stderr)
 	defer renderer.Close()
 
-	agent, err := newAgent(cfg, settings, model, pruner, renderer.Emit)
+	agent, err := newAgent(cfg, settings, model, prunerModel, renderer.Emit)
 	if err != nil {
 		return err
 	}
@@ -165,7 +161,7 @@ func runOnce(cfg config.Config, settings axon.Settings, model axon.Model, pruner
 
 // newAgent constructs the runtime. Both modes go through here so they cannot
 // drift into configuring the agent differently.
-func newAgent(cfg config.Config, settings axon.Settings, model axon.Model, pruner *axon.Pruner, onEvent func(context.Context, axon.Event)) (*axon.Agent, error) {
+func newAgent(cfg config.Config, settings axon.Settings, model axon.Model, prunerModel axon.Model, onEvent func(context.Context, axon.Event)) (*axon.Agent, error) {
 	servers := make([]axon.MCPServer, 0, len(cfg.MCPServers))
 	for _, s := range cfg.MCPServers {
 		servers = append(servers, axon.MCPServer{Command: s.Command, Args: s.Args, Env: s.Env})
@@ -177,7 +173,7 @@ func newAgent(cfg config.Config, settings axon.Settings, model axon.Model, prune
 		MCPServers:   servers,
 		OnEvent:      onEvent,
 		Settings:     settings,
-		Pruner:       pruner,
+		Pruner:       prunerModel,
 	})
 }
 
