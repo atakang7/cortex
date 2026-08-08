@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/atakang7/axon/agent"
+	"github.com/atakang7/axon"
 	"gopkg.in/yaml.v3"
 )
 
@@ -16,7 +16,7 @@ import (
 // An "agent personality" is a system prompt plus optional custom tools.
 // YAML is one way to express it; this file lives in the CLI because the
 // runtime (package agent) is YAML-agnostic. The loader produces an
-// agent.Config that gets handed to agent.New.
+// axon.Config that gets handed to axon.New.
 
 const (
 	// Built-in tool names — kept in sync with the runtime so YAML configs
@@ -149,9 +149,9 @@ func (c *AgentConfig) LoadSystemPrompt() (string, error) {
 }
 
 // BuildTools materializes the YAML tool list as runtime tools (shell
-// templates rendered into agent.Tool values).
-func (c *AgentConfig) BuildTools() ([]agent.Tool, error) {
-	var tools []agent.Tool
+// templates rendered into axon.Tool values).
+func (c *AgentConfig) BuildTools() ([]axon.Tool, error) {
+	var tools []axon.Tool
 	for _, tc := range c.Tools {
 		t, err := buildCustomTool(tc)
 		if err != nil {

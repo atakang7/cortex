@@ -3,17 +3,17 @@ package main
 import (
 	"strings"
 
-	"github.com/atakang7/axon/agent"
+	"github.com/atakang7/axon"
 )
 
 // commands.go — slash-command dispatch.
 //
 // Slash commands are a CLI affordance, not a runtime concept. The
 // runtime exposes the underlying operations (Reset, Undo, Cd) as
-// methods on *agent.Agent; this file maps the `/<word>` strings the
+// methods on *axon.Agent; this file maps the `/<word>` strings the
 // user types onto those methods.
 
-func handleSlash(a *agent.Agent, s string) bool {
+func handleSlash(a *axon.Agent, s string) bool {
 	switch {
 	case strings.HasPrefix(s, "/cd "):
 		target := strings.TrimSpace(strings.TrimPrefix(s, "/cd"))

@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/atakang7/axon/agent"
+	"github.com/atakang7/axon"
 )
 
 // lastChoice persists the user's previously selected providers so subsequent
@@ -45,7 +45,7 @@ func saveLastChoice(lc lastChoice) {
 }
 
 // pickProvider prints the available providers and reads a choice from stdin.
-func pickProvider(role, defaultKey string, providers map[string]agent.Provider, allowNone bool) string {
+func pickProvider(role, defaultKey string, providers map[string]axon.Provider, allowNone bool) string {
 	keys := ProviderNames(providers)
 	if len(keys) == 0 {
 		if !allowNone {
@@ -101,41 +101,41 @@ func pickProvider(role, defaultKey string, providers map[string]agent.Provider, 
 	}
 }
 
-func resolveProviderInteractive(providers map[string]agent.Provider, defaultKey string) (agent.Provider, string, error) {
+func resolveProviderInteractive(providers map[string]axon.Provider, defaultKey string) (axon.Provider, string, error) {
 	if p, err := ResolveProvider(providers); err == nil {
 		key := canonicalKey(providers, p)
 		return p, key, nil
 	} else if !errors.Is(err, ErrAmbiguousProvider) {
-		return agent.Provider{}, "", err
+		return axon.Provider{}, "", err
 	}
 	key := pickProvider("main agent", defaultKey, providers, false)
 	if key == "" {
-		return agent.Provider{}, "", fmt.Errorf("no main agent selected")
+		return axon.Provider{}, "", fmt.Errorf("no main agent selected")
 	}
 	p, err := ApplyEnvOverrides(providers[key])
 	return p, key, err
 }
 
-func resolvePrunerInteractive(providers map[string]agent.Provider, defaultKey string) (agent.Provider, string, error) {
+func resolvePrunerInteractive(providers map[string]axon.Provider, defaultKey string) (axon.Provider, string, error) {
 	if sel := strings.TrimSpace(EnvString("LLM_PRUNER_PROVIDER")); sel != "" {
 		if sel == "off" || sel == "none" {
-			return agent.Provider{}, "", nil
+			return axon.Provider{}, "", nil
 		}
 		if p, ok := providers[strings.ToLower(sel)]; ok {
 			pp, err := ApplyEnvOverrides(p)
 			return pp, strings.ToLower(sel), err
 		}
-		return agent.Provider{}, "", fmt.Errorf("LLM_PRUNER_PROVIDER=%q not found in %s", sel, ProvidersPath())
+		return axon.Provider{}, "", fmt.Errorf("LLM_PRUNER_PROVIDER=%q not found in %s", sel, ProvidersPath())
 	}
 	key := pickProvider("pruner (cleans context when it grows)", defaultKey, providers, true)
 	if key == "" {
-		return agent.Provider{}, "", nil
+		return axon.Provider{}, "", nil
 	}
 	p, err := ApplyEnvOverrides(providers[key])
 	return p, key, err
 }
 
-func canonicalKey(providers map[string]agent.Provider, p agent.Provider) string {
+func canonicalKey(providers map[string]axon.Provider, p axon.Provider) string {
 	want := strings.ToLower(p.Name) + "/" + p.Model
 	if _, ok := providers[want]; ok {
 		return want

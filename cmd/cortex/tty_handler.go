@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/atakang7/axon/agent"
+	"github.com/atakang7/axon"
 )
 
 // Color palette modeled on Claude Code's CLI: orange-tinted brand accent,
@@ -63,7 +63,7 @@ var ui = &uiState{atLineStart: true}
 // final answer always reaches stdout.
 var uiSilent bool
 
-func uiHeader(provider, model string, s *agent.Session) {
+func uiHeader(provider, model string, s *axon.Session) {
 	if uiSilent {
 		return
 	}
@@ -334,7 +334,7 @@ func uiSessionNew() {
 	fmt.Printf("\n%s  ○  new session%s\n\n", mute, reset)
 }
 
-func uiSessionInfo(s *agent.Session) {
+func uiSessionInfo(s *axon.Session) {
 	if uiSilent {
 		return
 	}
@@ -407,20 +407,20 @@ type ttyHandler struct {
 
 func newTTYHandler() *ttyHandler { return &ttyHandler{} }
 
-func (h *ttyHandler) Handle(_ context.Context, e agent.Event) {
+func (h *ttyHandler) Handle(_ context.Context, e axon.Event) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	switch e.Kind {
-	case agent.KindUserInput:
+	case axon.KindUserInput:
 		// Echo handled by the line reader; nothing to print.
-	case agent.KindAPICall:
+	case axon.KindAPICall:
 		uiInfo("calling API...")
 		if h.spinnerStop != nil {
 			h.spinnerStop()
 		}
 		h.spinnerStop = uiSpinner()
 		h.streamOpen = false
-	case agent.KindToken:
+	case axon.KindToken:
 		if h.spinnerStop != nil {
 			h.spinnerStop()
 			h.spinnerStop = nil
@@ -430,13 +430,13 @@ func (h *ttyHandler) Handle(_ context.Context, e agent.Event) {
 			h.streamOpen = true
 		}
 		uiToken(e.Text)
-	case agent.KindReasoning:
+	case axon.KindReasoning:
 		if h.spinnerStop != nil {
 			h.spinnerStop()
 			h.spinnerStop = nil
 		}
 		uiReasoning(e.Text)
-	case agent.KindToolArgDelta:
+	case axon.KindToolArgDelta:
 		if h.spinnerStop != nil {
 			h.spinnerStop()
 			h.spinnerStop = nil
@@ -444,12 +444,12 @@ func (h *ttyHandler) Handle(_ context.Context, e agent.Event) {
 		if e.Tool != nil {
 			uiToolArgDelta(e.Tool.Name, e.Tool.ArgsDelta)
 		}
-	case agent.KindAssistantEnd:
+	case axon.KindAssistantEnd:
 		if h.streamOpen {
 			uiResponse()
 			h.streamOpen = false
 		}
-	case agent.KindToolCall:
+	case axon.KindToolCall:
 		if h.spinnerStop != nil {
 			h.spinnerStop()
 			h.spinnerStop = nil
@@ -457,28 +457,28 @@ func (h *ttyHandler) Handle(_ context.Context, e agent.Event) {
 		if e.Tool != nil {
 			uiTool(e.Tool.Name, []byte(e.Tool.Args))
 		}
-	case agent.KindToolResult:
+	case axon.KindToolResult:
 		if e.Tool != nil {
 			uiToolResult(e.Tool.Result)
 		}
-	case agent.KindToolError:
+	case axon.KindToolError:
 		if e.Err != nil {
 			uiToolError(e.Err)
 		}
-	case agent.KindPruneStart:
+	case axon.KindPruneStart:
 		if h.spinnerStop != nil {
 			h.spinnerStop()
 		}
 		h.spinnerStop = uiSpinner()
 		uiInfo("pruning context...")
-	case agent.KindPruneEnd:
+	case axon.KindPruneEnd:
 		if h.spinnerStop != nil {
 			h.spinnerStop()
 			h.spinnerStop = nil
 		}
-	case agent.KindInfo:
+	case axon.KindInfo:
 		uiInfo(e.Text)
-	case agent.KindError:
+	case axon.KindError:
 		if h.spinnerStop != nil {
 			h.spinnerStop()
 			h.spinnerStop = nil

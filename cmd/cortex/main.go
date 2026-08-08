@@ -1,6 +1,6 @@
 // Command cortex is a terminal coding agent built on the axon runtime.
 //
-// All runtime logic lives in github.com/atakang7/axon/agent. This binary
+// All runtime logic lives in github.com/atakang7/axon/axon. This binary
 // wires the runtime to a terminal: an interactive provider picker, a
 // YAML loader for agent personalities, a colored TTY renderer, and
 // slash commands.
@@ -20,13 +20,13 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/atakang7/axon/agent"
+	"github.com/atakang7/axon"
 )
 
 func main() {
 	var (
 		flagPrompt = flag.String("prompt", "", "Run a single prompt non-interactively and exit when the assistant emits a final reply. Requires LLM_PROVIDER env to be set to skip the provider picker.")
-		flagAgent  = flag.String("agent", "", "Named agent config to load from $CORTEX_AGENTS_DIR (default ~/.config/cortex/agents/<name>.yaml). Empty = built-in default coding agent.")
+		flagAgent  = flag.String("agent", "", "Named agent config to load from $CORTEX_AGENTS_DIR (default ~/.config/cortex/agents/<name>.yaml). Empty = built-in default coding axon.")
 	)
 	flag.Parse()
 
@@ -49,7 +49,7 @@ func main() {
 	lc := loadLastChoice()
 
 	var (
-		p       agent.Provider
+		p       axon.Provider
 		mainKey string
 	)
 	if nonInteractive {
@@ -68,9 +68,9 @@ func main() {
 	}
 
 	var (
-		prunerProvider agent.Provider
+		prunerProvider axon.Provider
 		prunerKey      string
-		pruner         *agent.Pruner
+		pruner         *axon.Pruner
 	)
 	if nonInteractive {
 		if sel := EnvString("LLM_PRUNER_PROVIDER"); sel != "" && sel != "off" && sel != "none" {
@@ -88,20 +88,20 @@ func main() {
 		}
 	}
 	if prunerKey != "" {
-		pc, err := agent.OpenAI(agent.OpenAIConfig{Provider: prunerProvider, ExcludeReasoning: true})
+		pc, err := axon.OpenAI(axon.ClientConfig{Provider: prunerProvider, ExcludeReasoning: true})
 		if err != nil {
 			uiError(err)
 			return
 		}
-		
+
 		dp := &dynamicPruner{base: pc}
 		if p, ok := providers["openrouter/nvidia/nemotron-3-ultra:free"]; ok {
-			dp.normal, _ = agent.OpenAI(agent.OpenAIConfig{Provider: p, ExcludeReasoning: true})
+			dp.normal, _ = axon.OpenAI(axon.ClientConfig{Provider: p, ExcludeReasoning: true})
 		}
 		if p, ok := providers["openrouter/poolside/laguna-s-2.1:free"]; ok {
-			dp.heavy, _ = agent.OpenAI(agent.OpenAIConfig{Provider: p, ExcludeReasoning: true})
+			dp.heavy, _ = axon.OpenAI(axon.ClientConfig{Provider: p, ExcludeReasoning: true})
 		}
-		pruner = agent.NewPruner(agent.PrunerConfig{Model: dp})
+		pruner = axon.NewPruner(axon.PrunerConfig{Model: dp})
 	}
 
 	if !nonInteractive {
@@ -125,13 +125,13 @@ func main() {
 
 	tty := newTTYHandler()
 
-	m, err := agent.OpenAI(agent.OpenAIConfig{Provider: p})
+	m, err := axon.OpenAI(axon.ClientConfig{Provider: p})
 	if err != nil {
 		uiError(err)
 		return
 	}
 
-	ag, err := agent.New(agent.Config{
+	ag, err := axon.New(axon.Config{
 		Model:        m,
 		SystemPrompt: systemPrompt,
 		Tools:        customTools,
@@ -199,7 +199,7 @@ func main() {
 // --agent personality is supplied. The runtime itself has no default
 // prompt; if you're building a different product on top of the agent
 // package you should provide your own.
-const defaultCLIPrompt = `You are cortex, a terminal coding agent.
+const defaultCLIPrompt = `You are cortex, a terminal coding axon.
 
 You work in a real repository on the user's machine. The runtime gives
 you built-in tools: read, write, exec, search, task, bash_output,
@@ -213,12 +213,12 @@ Principles:
 - Stop when the goal is met. Don't invent follow-up work.`
 
 type dynamicPruner struct {
-	base   agent.Model
-	normal agent.Model
-	heavy  agent.Model
+	base   axon.Model
+	normal axon.Model
+	heavy  axon.Model
 }
 
-func (d *dynamicPruner) Complete(ctx context.Context, req agent.Request) (*agent.Msg, error) {
+func (d *dynamicPruner) Complete(ctx context.Context, req axon.Request) (*axon.Msg, error) {
 	tokens := 0
 	for _, m := range req.Messages {
 		tokens += len(m.Content)
@@ -266,4 +266,3 @@ Never park:
 - a block holding an unresolved error or a failing test
 
 Parking is one-way: the agent cannot get a parked block back.`
-
