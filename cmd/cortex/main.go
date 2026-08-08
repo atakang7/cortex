@@ -21,6 +21,7 @@ import (
 	"syscall"
 
 	"github.com/atakang7/axon"
+	"github.com/chzyer/readline"
 )
 
 func main() {
@@ -163,11 +164,35 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGHUP)
 	defer cancel()
 
-	var inputFn func() (string, bool)
-	if nonInteractive {
-		inputFn = singleShotInput(*flagPrompt)
-	} else {
-		inputFn = pasteAwareInput(os.Stdin)
+	var rl *readline.Instance
+	if !nonInteractive {
+		var err error
+		rl, err = readline.NewEx(&readline.Config{
+			Prompt:          "> ",
+			InterruptPrompt: "^C",
+			EOFPrompt:       "exit",
+		})
+		if err != nil {
+			uiError(err)
+			return
+		}
+		defer rl.Close()
+	}
+
+	delivered := false
+	inputFn := func() (string, bool) {
+		if nonInteractive {
+			if delivered {
+				return "", false
+			}
+			delivered = true
+			return *flagPrompt, true
+		}
+		line, err := rl.Readline()
+		if err != nil {
+			return "", false
+		}
+		return line, true
 	}
 
 	if !nonInteractive {
@@ -186,7 +211,9 @@ func main() {
 
 	// REPL: read input, handle slash commands, otherwise drive a Step.
 	for {
-		uiPrompt()
+		if nonInteractive {
+			uiPrompt()
+		}
 		line, ok := inputFn()
 		if !ok {
 			break
