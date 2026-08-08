@@ -31,6 +31,9 @@ type commandResult struct {
 	// Reset tells the UI to clear its own transcript state, because the
 	// session behind it was wiped.
 	Reset bool
+
+	// SelectModel tells the UI to open the model selection list.
+	SelectModel bool
 }
 
 // command is one slash command.
@@ -113,6 +116,14 @@ var commands = map[string]command{
 				len(session.Edits), plural(len(session.Edits), "edit", "edits"),
 				agent.SessionPath(),
 			)}
+		},
+	},
+
+	"/model": {
+		Name: "/model",
+		Help: "select a different model for this session",
+		Run: func(*axon.Agent, string) commandResult {
+			return commandResult{SelectModel: true}
 		},
 	},
 

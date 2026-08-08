@@ -130,6 +130,7 @@ func runInteractive(cfg config.Config, settings axon.Settings, model axon.Model,
 		Context:   ctx,
 		ModelName: cfg.ModelName,
 		AgentName: cfg.Name,
+		Settings:  settings,
 	})
 }
 

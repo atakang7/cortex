@@ -73,6 +73,10 @@ func inputHeight(lines int) int {
 // box so it reads as a continuation of the transcript, and the status line
 // sits below so the box stays the visual centre.
 func (m Model) View() string {
+	if m.pickingModel {
+		return m.picker.View()
+	}
+
 	var sections []string
 
 	if live := m.liveWork(); live != "" {

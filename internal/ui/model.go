@@ -9,12 +9,22 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/atakang7/axon"
 )
+
+type modelItem struct {
+	provider string
+	model    string
+}
+
+func (i modelItem) Title() string       { return i.model }
+func (i modelItem) Description() string { return i.provider }
+func (i modelItem) FilterValue() string { return i.provider + "/" + i.model }
 
 // model.go holds the UI's state and the rules for changing it. Everything the
 // user sees is derived from these fields; nothing here writes to the terminal
@@ -40,6 +50,9 @@ type Options struct {
 
 	// AgentName labels the personality in the banner, e.g. "reviewer".
 	AgentName string
+
+	// Settings provides the available endpoints and models for the picker.
+	Settings axon.Settings
 }
 
 // Model is the Bubble Tea model. It is passed by value, so every field must
@@ -55,6 +68,10 @@ type Model struct {
 	input   textarea.Model
 	spinner spinner.Model
 	width   int
+
+	settings     axon.Settings
+	picker       list.Model
+	pickingModel bool
 
 	// busy is true from submitting a turn until Step returns. It gates input
 	// and drives the spinner.
@@ -89,7 +106,19 @@ func New(opts Options) Model {
 		agentName: opts.AgentName,
 		input:     newInput(),
 		spinner:   newSpinner(),
+		settings:  opts.Settings,
 	}
+
+	var items []list.Item
+	for pName, p := range opts.Settings.Providers {
+		for _, mName := range p.ModelNames() {
+			items = append(items, modelItem{provider: pName, model: mName})
+		}
+	}
+	m.picker = list.New(items, list.NewDefaultDelegate(), defaultWidth, 14)
+	m.picker.Title = "Select Model"
+	m.picker.SetShowStatusBar(false)
+	m.picker.SetFilteringEnabled(true)
 
 	// Size everything now rather than waiting for the terminal to report
 	// itself, so the very first frame is laid out correctly even if the
@@ -156,6 +185,34 @@ func (m Model) Init() tea.Cmd {
 // Update is the single place UI state changes. It is organised by where a
 // message came from: the terminal, the runtime, or the turn command.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if m.pickingModel {
+		var cmd tea.Cmd
+		switch msg := msg.(type) {
+		case tea.KeyMsg:
+			if msg.Type == tea.KeyEsc {
+				m.pickingModel = false
+				return m, nil
+			}
+			if msg.Type == tea.KeyEnter {
+				i, ok := m.picker.SelectedItem().(modelItem)
+				if ok {
+					m.modelName = i.model
+					newModel, err := m.settings.NewClient(i.provider, i.model)
+					if err == nil {
+						m.agent.SetModel(newModel)
+					}
+				}
+				m.pickingModel = false
+				return m, tea.Println(renderNotice("model changed to "+m.modelName, m.width))
+			}
+		case tea.WindowSizeMsg:
+			m.picker.SetWidth(msg.Width)
+			m.picker.SetHeight(msg.Height)
+		}
+		m.picker, cmd = m.picker.Update(msg)
+		return m, cmd
+	}
+
 	switch msg := msg.(type) {
 
 	case tea.WindowSizeMsg:
@@ -356,6 +413,11 @@ func (m Model) applyCommand(res commandResult) (tea.Model, tea.Cmd) {
 
 	if res.Notice != "" {
 		return m, tea.Println(renderNotice(res.Notice, m.width))
+	}
+
+	if res.SelectModel {
+		m.pickingModel = true
+		return m, nil
 	}
 
 	return m, nil
