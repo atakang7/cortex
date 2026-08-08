@@ -18,10 +18,10 @@ import (
 
 // AgentConfig represents the declarative YAML configuration for the agent.
 type AgentConfig struct {
-	Name         string              `yaml:"name"`
-	Model        ModelConfig         `yaml:"model"`
-	SystemPrompt string              `yaml:"system_prompt"`
-	MCPServers   map[string]MCPSrv   `yaml:"mcp_servers"`
+	Name         string            `yaml:"name"`
+	Model        ModelConfig       `yaml:"model"`
+	SystemPrompt string            `yaml:"system_prompt"`
+	MCPServers   map[string]MCPSrv `yaml:"mcp_servers"`
 }
 
 type ModelConfig struct {
@@ -55,22 +55,35 @@ func main() {
 	flag.Parse()
 
 	// 1. Load Configuration
-	if *flagConfig == "" {
-		fmt.Println("Error: --config is required to spawn an agent.")
-		os.Exit(1)
+	configFile := *flagConfig
+	if configFile == "" {
+		configFile = "cortex.yaml"
 	}
 
 	var cfg AgentConfig
-	data, err := os.ReadFile(*flagConfig)
+	data, err := os.ReadFile(configFile)
 	if err != nil {
-		fmt.Printf("Config error: %v\n", err)
-		os.Exit(1)
+		if *flagConfig != "" {
+			fmt.Printf("Config error: %v\n", err)
+			os.Exit(1)
+		}
+		// Graceful default if no cortex.yaml exists
+		cfg = AgentConfig{
+			Name: "default",
+			SystemPrompt: "You are cortex, a minimal and highly capable terminal coding agent.\n\nPrinciples:\n- Read before you write. Search before you read.\n- One change per turn. Verify with exec.\n- Atomic edits only. /undo is byte-exact; don't fight it.\n- Act, don't narrate.\n- Stop when the goal is met.",
+			Model: ModelConfig{
+				Provider: "openai",
+				Name:     "gpt-4o",
+				APIKey:   "$OPENAI_API_KEY",
+			},
+		}
+	} else {
+		if err := yaml.Unmarshal(data, &cfg); err != nil {
+			fmt.Printf("Config parse error: %v\n", err)
+			os.Exit(1)
+		}
 	}
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		fmt.Printf("Config parse error: %v\n", err)
-		os.Exit(1)
-	}
-	
+
 	if cfg.Model.Name == "" {
 		fmt.Println("Error: model configuration is required in your config file.")
 		os.Exit(1)
@@ -80,6 +93,10 @@ func main() {
 	apiKey := cfg.Model.APIKey
 	if strings.HasPrefix(apiKey, "$") {
 		apiKey = os.Getenv(strings.TrimPrefix(apiKey, "$"))
+	}
+	if apiKey == "" {
+		fmt.Println("Error: API Key is required. Set it in the config or via the environment variable.")
+		os.Exit(1)
 	}
 
 	model, err := axon.NewClient(axon.ClientConfig{
