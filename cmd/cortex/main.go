@@ -100,11 +100,23 @@ func run() error {
 		prunerModel = pm
 	}
 
-	if *prompt != "" {
-		return runOnce(cfg, settings, model, prunerModel, *prompt)
+	// The trace log is a third, unfiltered event sink alongside whichever
+	// renderer the mode below picks. It never fails the run: a broken cache
+	// dir means no trace, not no cortex.
+	trace, err := ui.NewTraceLog(ui.DefaultTracePath())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "cortex: trace log disabled: %v\n", err)
+	}
+	defer trace.Close()
+	if path := trace.Path(); path != "" {
+		fmt.Fprintf(os.Stderr, "cortex: trace: %s\n", path)
 	}
 
-	return runInteractive(cfg, settings, model, prunerModel)
+	if *prompt != "" {
+		return runOnce(cfg, settings, model, prunerModel, trace, *prompt)
+	}
+
+	return runInteractive(cfg, settings, model, prunerModel, trace)
 }
 
 // runInteractive starts the full terminal UI.
@@ -113,37 +125,38 @@ func run() error {
 // arrives as a key, and the UI binds it to cancelling the turn rather than
 // killing the process. Only a signal the terminal cannot deliver as a
 // keystroke should end the program from outside.
-func runInteractive(cfg config.Config, settings axon.Settings, model axon.Model, prunerModel axon.Model) error {
+func runInteractive(cfg config.Config, settings axon.Settings, model axon.Model, prunerModel axon.Model, trace *ui.TraceLog) error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGHUP)
 	defer stop()
 
 	bridge := &ui.Bridge{}
 
-	agent, err := newAgent(cfg, settings, model, prunerModel, bridge.Emit)
+	agent, err := newAgent(cfg, settings, model, prunerModel, fanOut(bridge.Emit, trace.Emit))
 	if err != nil {
 		return err
 	}
 	defer agent.Close()
 
 	return ui.Run(ctx, bridge, ui.Options{
-		Agent:     agent,
-		Context:   ctx,
-		ModelName: cfg.ModelName,
-		AgentName: cfg.Name,
-		Settings:  settings,
+		Agent:      agent,
+		Context:    ctx,
+		ModelName:  cfg.ModelName,
+		PrunerName: cfg.Pruner.Model,
+		AgentName:  cfg.Name,
+		Settings:   settings,
 	})
 }
 
 // runOnce drives a single turn with no TUI. Ctrl-C ends the process here,
 // which is the ordinary expectation for a one-shot command.
-func runOnce(cfg config.Config, settings axon.Settings, model axon.Model, prunerModel axon.Model, prompt string) error {
+func runOnce(cfg config.Config, settings axon.Settings, model axon.Model, prunerModel axon.Model, trace *ui.TraceLog, prompt string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	renderer := ui.NewPlain(os.Stdout, os.Stderr)
 	defer renderer.Close()
 
-	agent, err := newAgent(cfg, settings, model, prunerModel, renderer.Emit)
+	agent, err := newAgent(cfg, settings, model, prunerModel, fanOut(renderer.Emit, trace.Emit))
 	if err != nil {
 		return err
 	}
@@ -158,6 +171,17 @@ func runOnce(cfg config.Config, settings axon.Settings, model axon.Model, pruner
 	}
 
 	return nil
+}
+
+// fanOut combines event sinks into the single func axon.Config.OnEvent
+// accepts. Every sink sees every event, in order, on the same goroutine —
+// that goroutine is always the turn's own, so none of them may block.
+func fanOut(sinks ...func(context.Context, axon.Event)) func(context.Context, axon.Event) {
+	return func(ctx context.Context, e axon.Event) {
+		for _, sink := range sinks {
+			sink(ctx, e)
+		}
+	}
 }
 
 // newAgent constructs the runtime. Both modes go through here so they cannot
