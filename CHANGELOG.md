@@ -1,3 +1,10 @@
+## [2.1.2](https://github.com/atakang7/cortex/compare/v2.1.1...v2.1.2) (2026-08-08)
+
+
+### Refactoring
+
+* complete rewrite into minimalist cli wrapper ([26265c3](https://github.com/atakang7/cortex/commit/26265c3e11e6f0e43875821515e684d4e3ee8312))
+
 ## [2.1.1](https://github.com/atakang7/cortex/compare/v2.1.0...v2.1.1) (2026-08-08)
 
 
