@@ -1,3 +1,10 @@
+## [2.1.5](https://github.com/atakang7/cortex/compare/v2.1.4...v2.1.5) (2026-08-08)
+
+
+### Refactoring
+
+* delegate provider config to axon's Settings system ([6588ad7](https://github.com/atakang7/cortex/commit/6588ad71a879615dd1121ca69227d798c1c4c98a))
+
 ## [2.1.4](https://github.com/atakang7/cortex/compare/v2.1.3...v2.1.4) (2026-08-08)
 
 
