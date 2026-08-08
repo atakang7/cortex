@@ -136,21 +136,27 @@ func (m Model) inputBox() string {
 // statusLine is the one persistent readout: where you are, what you are
 // talking to, and which key does the thing you most likely want next.
 func (m Model) statusLine() string {
-	facts := []string{m.modelName}
+	facts := []string{styleStatus.Render(m.modelName)}
+
+	if m.prunerName != "" {
+		facts = append(facts, stylePruner.Render("pruner: "+m.prunerName))
+	} else {
+		facts = append(facts, styleStatus.Render("pruner: off"))
+	}
 
 	if cwd := cwdLabel(m.agent.Session().Cwd); cwd != "" {
-		facts = append(facts, cwd)
+		facts = append(facts, styleStatus.Render(cwd))
 	}
 
 	if turn := m.agent.Session().Turn; turn > 0 {
-		facts = append(facts, fmt.Sprintf("turn %d", turn))
+		facts = append(facts, styleStatus.Render(fmt.Sprintf("turn %d", turn)))
 	}
 
 	if m.busy {
-		facts = append(facts, elapsed(m.turnStart))
+		facts = append(facts, styleStatus.Render(elapsed(m.turnStart)))
 	}
 
-	line := indent + styleStatus.Render(strings.Join(facts, " · "))
+	line := indent + strings.Join(facts, styleStatus.Render(" · "))
 
 	if hint := m.hint(); hint != "" {
 		line += styleStatus.Render("  ·  ") + hint

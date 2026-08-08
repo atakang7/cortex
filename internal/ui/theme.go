@@ -2,38 +2,38 @@ package ui
 
 import "github.com/charmbracelet/lipgloss"
 
-// theme.go owns every colour and every style in cortex. Nothing else in this
-// package may construct a lipgloss.Style or name a colour — if a new element
-// needs styling, it gets a style here and uses it by name. One owner means
-// the palette can be retuned in one place and the whole UI moves together.
-
-// The palette. Adaptive pairs carry a light-terminal value and a dark one, so
-// the UI stays legible without asking the user which theme they run.
 var (
 	colorBrand = lipgloss.AdaptiveColor{Light: "#C2410C", Dark: "#FDBA74"}
-	colorText  = lipgloss.AdaptiveColor{Light: "#1F2937", Dark: "#E5E7EB"}
 	colorMuted = lipgloss.AdaptiveColor{Light: "#6B7280", Dark: "#6B7280"}
 	colorFaint = lipgloss.AdaptiveColor{Light: "#9CA3AF", Dark: "#4B5563"}
 	colorTool  = lipgloss.AdaptiveColor{Light: "#0369A1", Dark: "#7DD3FC"}
 	colorOK    = lipgloss.AdaptiveColor{Light: "#15803D", Dark: "#86EFAC"}
 	colorBad   = lipgloss.AdaptiveColor{Light: "#B91C1C", Dark: "#FCA5A5"}
+
+	// colorUser and colorAssistant give the two speakers in the transcript
+	// their own identity, so a scroll back through a long session reads as a
+	// conversation at a glance rather than a wall of one color.
+	colorUser      = lipgloss.AdaptiveColor{Light: "#0E7490", Dark: "#67E8F9"}
+	colorAssistant = lipgloss.AdaptiveColor{Light: "#4338CA", Dark: "#A5B4FC"}
+
+	// colorPruner marks the curator as a distinct third voice — neither the
+	// user's nor the model's — so its activity doesn't read as generic system
+	// chatter.
+	colorPruner = lipgloss.AdaptiveColor{Light: "#7E22CE", Dark: "#D8B4FE"}
 )
 
-// Transcript styles — the committed record of the conversation.
 var (
 	styleUserMark = lipgloss.NewStyle().Foreground(colorBrand).Bold(true)
 
-	styleUserText = lipgloss.NewStyle().Foreground(colorText).Bold(true)
+	styleUserText = lipgloss.NewStyle().Foreground(colorUser).Bold(true)
 
-	styleAssistant = lipgloss.NewStyle().Foreground(colorText)
+	styleAssistant = lipgloss.NewStyle().Foreground(colorAssistant)
 
-	// Reasoning is the model thinking aloud. It is deliberately the least
-	// legible thing on screen: present if you look for it, ignorable if not.
 	styleReasoning = lipgloss.NewStyle().Foreground(colorFaint).Italic(true)
+
+	stylePruner = lipgloss.NewStyle().Foreground(colorPruner)
 )
 
-// Tool-card styles. A card is a bordered block: a header naming the tool, the
-// arguments that were passed, and a preview of what came back.
 var (
 	styleToolName = lipgloss.NewStyle().Foreground(colorTool).Bold(true)
 
@@ -46,7 +46,6 @@ var (
 	styleToolBad = lipgloss.NewStyle().Foreground(colorBad)
 )
 
-// Chrome — the parts of the screen that are not transcript.
 var (
 	styleInputFrame = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
@@ -68,8 +67,6 @@ var (
 	styleSpinner = lipgloss.NewStyle().Foreground(colorBrand)
 )
 
-// Glyphs. Named here so the whole UI speaks one visual vocabulary, and so a
-// terminal that renders one of them badly can be fixed in one edit.
 const (
 	glyphPrompt   = "❯"
 	glyphToolHead = "▐"
@@ -77,4 +74,5 @@ const (
 	glyphToolTail = "└"
 	glyphOK       = "✓"
 	glyphBad      = "✗"
+	glyphPrune    = "✂"
 )

@@ -90,10 +90,28 @@ func (p *Plain) Emit(_ context.Context, e axon.Event) {
 			c.Err = e.Err
 		})
 
+	case axon.KindPruneStart:
+		if e.Prune == nil {
+			return
+		}
+		p.line(renderPruner(fmt.Sprintf("pruning context (%s tokens)...", compactCount(e.Prune.Before)), p.width))
+
+	case axon.KindPruneEnd:
+		if e.Prune == nil {
+			return
+		}
+		p.line(renderPruner(fmt.Sprintf("context pruned · %s → %s tokens",
+			compactCount(e.Prune.Before), compactCount(e.Prune.After)), p.width))
+
 	case axon.KindInfo:
 		p.line(renderNotice(e.Text, p.width))
 
 	case axon.KindError:
+		if isPrunerErr(e.Err) {
+			p.line(renderPruner("pruning failed: "+strings.TrimPrefix(e.Err.Error(), "pruner: "), p.width))
+			return
+		}
+
 		if text := errorText(e.Err, e.Text); text != "" {
 			p.line(renderError(text, p.width))
 		}

@@ -48,6 +48,10 @@ type Options struct {
 	// ModelName is shown in the status line, e.g. "gpt-4o".
 	ModelName string
 
+	// PrunerName is the curator model shown in the status line, e.g.
+	// "gpt-4o-mini". Empty means no pruner is configured.
+	PrunerName string
+
 	// AgentName labels the personality in the banner, e.g. "reviewer".
 	AgentName string
 
@@ -62,8 +66,9 @@ type Model struct {
 	agent   *axon.Agent
 	turnCtx context.Context
 
-	modelName string
-	agentName string
+	modelName  string
+	prunerName string
+	agentName  string
 
 	input   textarea.Model
 	spinner spinner.Model
@@ -101,10 +106,11 @@ type Model struct {
 // constructs — the first frame is produced by Init.
 func New(opts Options) Model {
 	m := Model{
-		agent:     opts.Agent,
-		turnCtx:   opts.Context,
-		modelName: opts.ModelName,
-		agentName: opts.AgentName,
+		agent:      opts.Agent,
+		turnCtx:    opts.Context,
+		modelName:  opts.ModelName,
+		prunerName: opts.PrunerName,
+		agentName:  opts.AgentName,
 		input:     newInput(),
 		spinner:   newSpinner(),
 		settings:  opts.Settings,
@@ -165,6 +171,20 @@ func newInput() textarea.Model {
 	return input
 }
 
+// elapsedTickMsg drives redraws of the "thinking Ns" counter while a turn is
+// in flight. It carries no data — elapsed() reads m.turnStart fresh each
+// render — its only job is to force Update/View to run on a schedule the
+// spinner's own tick chain doesn't guarantee.
+type elapsedTickMsg struct{}
+
+// elapsedTickInterval is coarse enough not to burn CPU on a redraw loop and
+// fine enough that "thinking 3s" never visibly lags real time.
+const elapsedTickInterval = 500 * time.Millisecond
+
+func tickElapsed() tea.Cmd {
+	return tea.Tick(elapsedTickInterval, func(time.Time) tea.Msg { return elapsedTickMsg{} })
+}
+
 func newSpinner() spinner.Model {
 	s := spinner.New()
 
@@ -203,6 +223,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if err == nil {
 						if m.pickingPruner {
 							m.agent.SetPrunerModel(newModel)
+							m.prunerName = i.model
 							notice = "pruner changed to " + i.model
 						} else {
 							m.agent.SetModel(newModel)
@@ -236,6 +257,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.spinner, cmd = m.spinner.Update(msg)
 
 		return m, cmd
+
+	case elapsedTickMsg:
+		// The elapsed counter reads m.turnStart fresh on every render, so this
+		// message exists only to force one — no state to update. It stops
+		// rescheduling itself the moment the turn is no longer busy, rather
+		// than relying on the spinner's own tick chain, which can silently
+		// stop advancing if a tick is ever dropped.
+		if !m.busy {
+			return m, nil
+		}
+
+		return m, tickElapsed()
 
 	// ----- streamed output -------------------------------------------------
 
@@ -277,16 +310,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// ----- runtime chatter -------------------------------------------------
 
 	case pruneStartMsg:
-		return m, tea.Println(renderNotice(fmt.Sprintf("pruning context (%s tokens)...", compactCount(msg.Before)), m.width))
+		return m, tea.Println(renderPruner(fmt.Sprintf("pruning context (%s tokens)...", compactCount(msg.Before)), m.width))
 
 	case pruneEndMsg:
-		return m, tea.Println(renderNotice(fmt.Sprintf("context pruned · %s → %s tokens",
+		return m, tea.Println(renderPruner(fmt.Sprintf("context pruned · %s → %s tokens",
 			compactCount(msg.Before), compactCount(msg.After)), m.width))
 
 	case noticeMsg:
 		return m, tea.Println(renderNotice(string(msg), m.width))
 
 	case runtimeErrorMsg:
+		if isPrunerErr(msg.Err) {
+			return m, tea.Println(renderPruner("pruning failed: "+strings.TrimPrefix(msg.Err.Error(), "pruner: "), m.width))
+		}
+
 		if text := errorText(msg.Err, msg.Text); text != "" {
 			return m, tea.Println(renderNotice(text, m.width))
 		}
@@ -391,7 +428,7 @@ func (m Model) submit() (tea.Model, tea.Cmd) {
 	m.interrupted = false
 	m.turnStart = time.Now()
 
-	return m, tea.Sequence(echo, m.runTurn(line))
+	return m, tea.Sequence(echo, tea.Batch(m.runTurn(line), tickElapsed()))
 }
 
 // runTurn drives one Step on its own goroutine. Output does not come back
@@ -553,20 +590,21 @@ func (m Model) finishTurn(err error) (tea.Model, tea.Cmd) {
 // Small helpers
 // ---------------------------------------------------------------------------
 
-// errorText renders a mid-turn runtime error, or "" for the ones not worth
-// interrupting the user over. Pruner failures are the notable case: the
-// curator is an optimisation, and its failure changes nothing the user must
-// act on.
+// isPrunerErr reports whether err came from a curator pass. Pruning is an
+// optimisation, so its failure never interrupts the turn — but it is still
+// reported as a quiet notice rather than dropped, so the user can tell the
+// curator ran and what went wrong instead of guessing whether it exists.
+func isPrunerErr(err error) bool {
+	return err != nil && strings.HasPrefix(err.Error(), "pruner:")
+}
+
+// errorText renders a mid-turn runtime error.
 func errorText(err error, text string) string {
 	if err == nil {
 		return text
 	}
 
 	message := err.Error()
-	if strings.HasPrefix(message, "pruner:") {
-		return ""
-	}
-
 	if text != "" {
 		return text + ": " + message
 	}

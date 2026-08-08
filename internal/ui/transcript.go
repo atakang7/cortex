@@ -53,6 +53,13 @@ func renderError(text string, width int) string {
 	return block(styleError, indent+glyphBad+" ", indent+"  ", text, width)
 }
 
+// renderPruner lays out the curator's own activity — start, end, and
+// failure — in its own color, so it reads as a third voice rather than
+// blending into generic system notices.
+func renderPruner(text string, width int) string {
+	return block(stylePruner, indent+glyphPrune+" ", indent+"  ", text, width)
+}
+
 // block wraps text to the available width and styles it line by line.
 //
 // Styling each line separately, rather than handing the whole paragraph to a
