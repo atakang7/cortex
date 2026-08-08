@@ -46,6 +46,10 @@ type Config struct {
 	// MCPServers are subprocesses axon will spawn and harvest tools from.
 	MCPServers []MCPServer
 
+	// Pruner names the secondary model for context pruning. Both fields
+	// empty means no pruner — context grows until the provider refuses it.
+	Pruner PrunerRef
+
 	// Source records which file this came from, for the status line. Empty
 	// when the built-in defaults were used.
 	Source string
@@ -56,6 +60,13 @@ type MCPServer struct {
 	Command string
 	Args    []string
 	Env     []string
+}
+
+// PrunerRef points at the secondary model used for context pruning.
+// Both fields empty means no pruner.
+type PrunerRef struct {
+	Provider string
+	Model    string
 }
 
 // ErrNoModel means neither a config file nor the environment named a model.
@@ -74,6 +85,7 @@ type file struct {
 	Provider     string            `yaml:"provider"`
 	Model        string            `yaml:"model"`
 	SystemPrompt string            `yaml:"system_prompt"`
+	Pruner       prunerFile        `yaml:"pruner"`
 	MCPServers   map[string]mcpSrv `yaml:"mcp_servers"`
 }
 
@@ -81,6 +93,11 @@ type mcpSrv struct {
 	Command string   `yaml:"command"`
 	Args    []string `yaml:"args"`
 	Env     []string `yaml:"env"`
+}
+
+type prunerFile struct {
+	Provider string `yaml:"provider"`
+	Model    string `yaml:"model"`
 }
 
 // ---------------------------------------------------------------------------
@@ -186,6 +203,8 @@ func overlay(dst *file, src file) {
 	setString(&dst.Provider, src.Provider)
 	setString(&dst.Model, src.Model)
 	setString(&dst.SystemPrompt, src.SystemPrompt)
+	setString(&dst.Pruner.Provider, src.Pruner.Provider)
+	setString(&dst.Pruner.Model, src.Pruner.Model)
 
 	if len(src.MCPServers) > 0 {
 		if dst.MCPServers == nil {
@@ -236,6 +255,11 @@ func finalize(f file, source string) (Config, error) {
 
 	if cfg.Provider == "" {
 		return Config{}, fmt.Errorf("config: model %q has no provider — set provider: in the config or export LLM_PROVIDER", cfg.ModelName)
+	}
+
+	cfg.Pruner = PrunerRef{
+		Provider: f.Pruner.Provider,
+		Model:    f.Pruner.Model,
 	}
 
 	prompt, err := resolveSystemPrompt(f.SystemPrompt)
