@@ -1,3 +1,10 @@
+## [2.3.0](https://github.com/atakang7/cortex/compare/v2.2.1...v2.3.0) (2026-08-08)
+
+
+### Features
+
+* add /model slash command for interactive model selection ([bf33a39](https://github.com/atakang7/cortex/commit/bf33a3956bfd200580870f952735db4269dd2cc6))
+
 ## [2.2.1](https://github.com/atakang7/cortex/compare/v2.2.0...v2.2.1) (2026-08-08)
 
 
