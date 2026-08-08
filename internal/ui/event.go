@@ -57,6 +57,33 @@ func (b *Bridge) Emit(_ context.Context, e axon.Event) {
 // the Update switch free of cases that do nothing.
 func translate(e axon.Event) tea.Msg {
 	switch e.Kind {
+	case axon.KindSessionStart:
+		if e.Session == nil {
+			return nil
+		}
+		return sessionStartMsg{Provider: e.Session.Provider, Model: e.Session.Model, PrunerOn: e.Session.PrunerOn}
+
+	case axon.KindSessionEnd:
+		return sessionEndMsg{}
+
+	case axon.KindUserInput:
+		return userInputMsg(e.Text)
+
+	case axon.KindTurnStart:
+		return turnStartMsg{Turn: e.Turn}
+
+	case axon.KindTurnEnd:
+		return turnEndMsg{Turn: e.Turn}
+
+	case axon.KindAPICall:
+		return apiCallMsg{Turn: e.Turn}
+
+	case axon.KindToolArgDelta:
+		if e.Tool == nil || e.Tool.ArgsDelta == "" {
+			return nil
+		}
+		return toolArgDeltaMsg{ID: e.Tool.ID, Name: e.Tool.Name, Delta: e.Tool.ArgsDelta}
+
 	case axon.KindToken:
 		return tokenMsg(e.Text)
 
@@ -131,6 +158,16 @@ type toolCallMsg struct {
 	Args json.RawMessage
 }
 
+// toolArgDeltaMsg is one streamed fragment of a tool call's arguments,
+// arriving before the call itself resolves into a toolCallMsg. Applied to
+// the matching open card so a long write's contents grow on screen as the
+// model produces them, rather than appearing all at once at the end.
+type toolArgDeltaMsg struct {
+	ID    string
+	Name  string
+	Delta string
+}
+
 // toolResultMsg closes a tool card successfully.
 type toolResultMsg struct {
 	ID     string
@@ -175,3 +212,25 @@ type pruneEndMsg struct {
 type turnDoneMsg struct {
 	Err error
 }
+
+// sessionStartMsg announces the runtime a session is bound to.
+type sessionStartMsg struct {
+	Provider string
+	Model    string
+	PrunerOn bool
+}
+
+// sessionEndMsg marks the end of a session.
+type sessionEndMsg struct{}
+
+// userInputMsg echoes the input the runtime received for a turn, as reported
+// by axon itself rather than by cortex's own input handling.
+type userInputMsg string
+
+// turnStartMsg and turnEndMsg mark a turn's boundaries as the runtime sees
+// them, independent of the UI's own busy/idle bookkeeping.
+type turnStartMsg struct{ Turn int }
+type turnEndMsg struct{ Turn int }
+
+// apiCallMsg marks a model API request beginning.
+type apiCallMsg struct{ Turn int }

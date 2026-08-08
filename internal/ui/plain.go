@@ -59,6 +59,36 @@ func NewPlain(out, errOut io.Writer) *Plain {
 func (p *Plain) Emit(_ context.Context, e axon.Event) {
 	switch e.Kind {
 
+	case axon.KindSessionStart:
+		if e.Session == nil {
+			return
+		}
+		text := fmt.Sprintf("session started · %s/%s", e.Session.Provider, e.Session.Model)
+		if e.Session.PrunerOn {
+			text += " · pruner on"
+		}
+		p.line(renderNotice(text, p.width))
+
+	case axon.KindSessionEnd:
+		p.line(renderNotice("session ended", p.width))
+
+	case axon.KindUserInput:
+		p.line(renderNotice(fmt.Sprintf("input · %s", e.Text), p.width))
+
+	case axon.KindTurnStart:
+		p.line(renderNotice(fmt.Sprintf("turn %d started", e.Turn), p.width))
+
+	case axon.KindTurnEnd:
+		p.line(renderNotice(fmt.Sprintf("turn %d ended", e.Turn), p.width))
+
+	case axon.KindAPICall:
+		p.line(renderNotice(fmt.Sprintf("turn %d · calling model...", e.Turn), p.width))
+
+	case axon.KindToolArgDelta:
+		// No live area to redraw in this mode: the header printed at
+		// KindToolCall already carries the resolved args, so a fragment
+		// arriving ahead of it has nothing useful to show yet.
+
 	case axon.KindToken:
 		if e.Text == "" {
 			return

@@ -2,6 +2,7 @@ package ui
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -270,6 +271,30 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		return m, tickElapsed()
 
+	// ----- session and turn boundaries --------------------------------------
+
+	case sessionStartMsg:
+		text := fmt.Sprintf("session started · %s/%s", msg.Provider, msg.Model)
+		if msg.PrunerOn {
+			text += " · pruner on"
+		}
+		return m, tea.Println(renderNotice(text, m.width))
+
+	case sessionEndMsg:
+		return m, tea.Println(renderNotice("session ended", m.width))
+
+	case userInputMsg:
+		return m, tea.Println(renderNotice(fmt.Sprintf("input · %s", string(msg)), m.width))
+
+	case turnStartMsg:
+		return m, tea.Println(renderNotice(fmt.Sprintf("turn %d started", msg.Turn), m.width))
+
+	case turnEndMsg:
+		return m, tea.Println(renderNotice(fmt.Sprintf("turn %d ended", msg.Turn), m.width))
+
+	case apiCallMsg:
+		return m, tea.Println(renderNotice(fmt.Sprintf("turn %d · calling model...", msg.Turn), m.width))
+
 	// ----- streamed output -------------------------------------------------
 
 	case tokenMsg:
@@ -293,9 +318,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case toolCallMsg:
 		commit := m.commitReasoning()
-		m.cards = append(m.cards, toolCard{ID: msg.ID, Name: msg.Name, Args: msg.Args})
+		if index := m.findCard(msg.ID, msg.Name); index >= 0 {
+			m.cards[index].Args = msg.Args
+		} else {
+			m.cards = append(m.cards, toolCard{ID: msg.ID, Name: msg.Name, Args: msg.Args})
+		}
 
 		return m, commit
+
+	case toolArgDeltaMsg:
+		// Deltas can arrive before the call resolves into a toolCallMsg, so a
+		// card may not exist yet — open one early rather than dropping the
+		// fragment, since KindToolCall for the same ID will still land on
+		// top of it once the runtime knows the full args.
+		if index := m.findCard(msg.ID, msg.Name); index >= 0 {
+			m.cards[index].Args = append(m.cards[index].Args, msg.Delta...)
+		} else {
+			m.cards = append(m.cards, toolCard{ID: msg.ID, Name: msg.Name, Args: json.RawMessage(msg.Delta)})
+		}
+
+		return m, nil
 
 	case toolResultMsg:
 		return m.closeCard(msg.ID, msg.Name, func(c *toolCard) {
