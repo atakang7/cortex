@@ -1,3 +1,10 @@
+## [2.4.0](https://github.com/atakang7/cortex/compare/v2.3.0...v2.4.0) (2026-08-08)
+
+
+### Features
+
+* implement /pruner command and handle pruner events ([157517e](https://github.com/atakang7/cortex/commit/157517ed704612a26854b16c587bba427797eb57))
+
 ## [2.3.0](https://github.com/atakang7/cortex/compare/v2.2.1...v2.3.0) (2026-08-08)
 
 
