@@ -15,7 +15,7 @@ import (
 	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/atakang7/axon"
+	"github.com/atakang7/axon/v2"
 )
 
 type modelItem struct {

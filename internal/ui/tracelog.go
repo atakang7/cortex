@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/atakang7/axon"
+	"github.com/atakang7/axon/v2"
 )
 
 // tracelog.go is the third event sink, alongside Bridge (the live TUI) and

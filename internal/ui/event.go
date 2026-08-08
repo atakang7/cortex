@@ -7,7 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/atakang7/axon"
+	"github.com/atakang7/axon/v2"
 )
 
 // event.go is the seam between the two concurrency models in this program.

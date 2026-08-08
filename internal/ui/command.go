@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/atakang7/axon"
+	"github.com/atakang7/axon/v2"
 )
 
 // command.go owns the slash commands: input that cortex handles itself

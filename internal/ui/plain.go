@@ -6,7 +6,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/atakang7/axon"
+	"github.com/atakang7/axon/v2"
 )
 
 // plain.go is the non-interactive renderer, used by `cortex --prompt`. There
