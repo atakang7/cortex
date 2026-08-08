@@ -19,8 +19,16 @@ import (
 // AgentConfig represents the declarative YAML configuration for the agent.
 type AgentConfig struct {
 	Name         string              `yaml:"name"`
+	Model        ModelConfig         `yaml:"model"`
 	SystemPrompt string              `yaml:"system_prompt"`
 	MCPServers   map[string]MCPSrv   `yaml:"mcp_servers"`
+}
+
+type ModelConfig struct {
+	Provider string `yaml:"provider"`
+	Name     string `yaml:"name"`
+	BaseURL  string `yaml:"base_url"`
+	APIKey   string `yaml:"api_key"` // can be an env var name like $OPENAI_API_KEY
 }
 
 type MCPSrv struct {
@@ -46,56 +54,45 @@ func main() {
 	)
 	flag.Parse()
 
-	// 1. Resolve Provider via Env
-	modelName := os.Getenv("CORTEX_MODEL")
-	if modelName == "" {
-		modelName = "openai/gpt-4o"
-	}
-	apiKey := os.Getenv("API_KEY")
-	if apiKey == "" && os.Getenv("OPENAI_API_KEY") != "" {
-		apiKey = os.Getenv("OPENAI_API_KEY")
-	}
-	if apiKey == "" {
-		fmt.Println("Error: API_KEY or OPENAI_API_KEY environment variable is required.")
+	// 1. Load Configuration
+	if *flagConfig == "" {
+		fmt.Println("Error: --config is required to spawn an agent.")
 		os.Exit(1)
 	}
 
-	parts := strings.SplitN(modelName, "/", 2)
-	providerName := "openai"
-	modelID := parts[0]
-	if len(parts) == 2 {
-		providerName = parts[0]
-		modelID = parts[1]
+	var cfg AgentConfig
+	data, err := os.ReadFile(*flagConfig)
+	if err != nil {
+		fmt.Printf("Config error: %v\n", err)
+		os.Exit(1)
+	}
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		fmt.Printf("Config parse error: %v\n", err)
+		os.Exit(1)
+	}
+	
+	if cfg.Model.Name == "" {
+		fmt.Println("Error: model configuration is required in your config file.")
+		os.Exit(1)
+	}
+
+	// Resolve API Key (allow $ENV_VAR syntax in config)
+	apiKey := cfg.Model.APIKey
+	if strings.HasPrefix(apiKey, "$") {
+		apiKey = os.Getenv(strings.TrimPrefix(apiKey, "$"))
 	}
 
 	model, err := axon.NewClient(axon.ClientConfig{
 		Provider: axon.Provider{
-			Name:    providerName,
-			Model:   modelID,
+			Name:    cfg.Model.Provider,
+			Model:   cfg.Model.Name,
 			APIKey:  apiKey,
-			BaseURL: "https://openrouter.ai/api/v1",
+			BaseURL: cfg.Model.BaseURL,
 		},
 	})
 	if err != nil {
 		fmt.Printf("Model error: %v\n", err)
 		os.Exit(1)
-	}
-
-	// 2. Load Configuration
-	var cfg AgentConfig
-	if *flagConfig != "" {
-		data, err := os.ReadFile(*flagConfig)
-		if err != nil {
-			fmt.Printf("Config error: %v\n", err)
-			os.Exit(1)
-		}
-		if err := yaml.Unmarshal(data, &cfg); err != nil {
-			fmt.Printf("Config parse error: %v\n", err)
-			os.Exit(1)
-		}
-	} else {
-		// Default
-		cfg.SystemPrompt = "You are cortex, a minimal and highly capable terminal coding agent.\n\nPrinciples:\n- Read before you write. Search before you read.\n- One change per turn. Verify with exec.\n- Atomic edits only. /undo is byte-exact; don't fight it.\n- Act, don't narrate.\n- Stop when the goal is met."
 	}
 
 	// Map MCP servers
@@ -121,7 +118,7 @@ func main() {
 	}
 	defer ag.Close()
 
-	fmt.Printf("\n%s cortex%s · %s%s%s\n\n", brand, reset, mute, modelName, reset)
+	fmt.Printf("\n%s cortex%s · %s%s%s\n\n", brand, reset, mute, cfg.Model.Name, reset)
 
 	// 4. Non-Interactive Mode
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGHUP, os.Interrupt)
