@@ -1,26 +1,30 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import ThemeToggle from '../components/ThemeToggle.astro';
 ---
 <Layout title="cortex — a terminal coding agent" description="A terminal coding agent built on the axon runtime. Streaming chat, tool dispatch, append-only sessions, and secondary-LLM context pruning — all from your terminal.">
 
 <!-- Nav -->
-<nav class="landing-nav" id="nav">
+<nav class="landing-nav" id="nav" aria-label="Primary">
   <div class="nav-brand">
-    <span class="glyph">◆</span> cortex
+    <span class="glyph" aria-hidden="true">◆</span> cortex
   </div>
   <ul class="nav-links">
     <li><a href="/docs/">Docs</a></li>
     <li><a href="/docs/getting-started/install">Install</a></li>
     <li><a href="/docs/concepts/architecture">Architecture</a></li>
     <li><a href="/docs/playground/overview">Playground</a></li>
-    <li><a href="https://github.com/atakang7/cortex">GitHub ↗</a></li>
+    <li><a href="https://github.com/atakang7/cortex" rel="noopener">GitHub ↗</a></li>
   </ul>
-  <a class="nav-cta" href="/docs/getting-started/quick-start">Get started</a>
+  <div class="nav-actions">
+    <ThemeToggle />
+    <a class="nav-cta" href="/docs/getting-started/quick-start">Get started</a>
+  </div>
 </nav>
 
 <!-- Hero -->
-<section class="hero">
-  <div class="hero-bg">
+<section class="hero" aria-labelledby="hero-title">
+  <div class="hero-bg" aria-hidden="true">
     <div class="hero-grid"></div>
     <div class="hero-glow one"></div>
     <div class="hero-glow two"></div>
@@ -28,9 +32,9 @@ import Layout from '../layouts/Layout.astro';
   </div>
   <div class="hero-content">
     <div class="hero-badge">
-      <span class="dot"></span> built on the axon runtime
+      <span class="dot" aria-hidden="true"></span> built on the axon runtime
     </div>
-    <h1 class="hero-title">
+    <h1 class="hero-title" id="hero-title">
       The coding agent that lives<br/>
       <span class="gradient">in your terminal.</span>
     </h1>
@@ -49,15 +53,15 @@ import Layout from '../layouts/Layout.astro';
     </div>
 
     <!-- Terminal mockup -->
-    <div class="terminal-mock">
+    <div class="terminal-mock" role="img" aria-label="cortex terminal session: editing internal/ui/view.go and theme.go, running tests, passing">
       <div class="terminal-window">
-        <div class="terminal-bar">
+        <div class="terminal-bar" aria-hidden="true">
           <span class="terminal-dot r"></span>
           <span class="terminal-dot y"></span>
           <span class="terminal-dot g"></span>
           <span class="terminal-title">cortex — internal/ui</span>
         </div>
-        <div class="terminal-body" id="term">
+        <div class="terminal-body" id="term" aria-hidden="true">
           <div class="t-line"><span class="t-notice">  session started · openrouter/deepseek-v3.2 · pruner on</span></div>
           <div class="t-line"><span class="t-notice">  turn 1 started</span></div>
           <div class="t-line"><span class="t-user"><span class="t-mark">❯</span> add a spinner to the waiting state</span></div>

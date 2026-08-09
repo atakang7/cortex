@@ -12,20 +12,23 @@ const slug = 'playground/overview';
     so a bad habit can be traced to the prompt or tool description that caused it.
   </blockquote>
 
-  <h2>The two commands</h2>
-  <pre><code>./run.sh &lt;task&gt; [label]     # run cortex on a task, keep everything
-./trace.sh &lt;view&gt; &lt;trace&gt;  # read what happened</code></pre>
+  <h2>The commands</h2>
+  <pre><code>./run.sh &lt;task&gt; [label]             # run cortex on one task, keep everything
+./batch.sh [-n runs] [task ...]      # repeat a suite and keep going on failure
+./report.sh [runs/&lt;task-label&gt; ...]  # summarize pass/fail, cost and behavior
+./trace.sh &lt;view&gt; &lt;trace&gt;            # read what happened inside one run</code></pre>
 
   <h2>What a run keeps</h2>
   <p>
     Each run gets its own directory under <code>runs/</code> holding a pristine copy of the task's
-    seed project, the trace cortex wrote, and cortex's own stdout. The seed is never touched, so a
-    run is repeatable and two runs are directly comparable:
+    seed project, the trace cortex wrote, cortex's own stdout, and verifier output. The seed is
+    never touched, so a run is repeatable and two runs are directly comparable:
   </p>
   <ul>
     <li><code>trace.jsonl</code> — the wire-level record</li>
     <li><code>diff.patch</code> — exactly what the agent changed</li>
     <li><code>stdout.txt</code> / <code>stderr.txt</code> — the agent's own output</li>
+    <li><code>verify_stdout.txt</code> / <code>verify_stderr.txt</code> — final project verification</li>
     <li><code>status.txt</code> — git status of the work tree</li>
   </ul>
 
@@ -55,6 +58,12 @@ const slug = 'playground/overview';
 ./trace.sh system   runs/report-final/trace.jsonl   # the prompt under test
 ./trace.sh prompt   runs/report-final/trace.jsonl pruner
 ./trace.sh tools    runs/report-final/trace.jsonl   # shows a wrong approach fastest</code></pre>
+
+  <p>
+    <code>report.sh</code> is the first thing to read after a suite. It flags failed verification,
+    tool errors, runtime errors, no-op prunes, large call counts, and no-diff runs before you dive
+    into individual traces.
+  </p>
 
   <p>Continue to <a href="/docs/playground/running-tasks/">Running tasks</a> and <a href="/docs/playground/reading-traces/">Reading traces</a> for the details.</p>
 

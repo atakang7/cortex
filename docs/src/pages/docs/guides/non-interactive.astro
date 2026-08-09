@@ -16,6 +16,17 @@ const slug = 'guides/non-interactive';
   <pre><code>cortex --prompt "list every exported function in internal/ui" > api.txt</code></pre>
   <pre><code>cortex --prompt "summarize the TODOs" | fold -s | head -40</code></pre>
 
+  <h2>Objective verification</h2>
+  <p>
+    When a command can judge the result, add <code>--verify</code>. A failing verifier is sent back
+    to the same session for up to <code>--repair-attempts</code> extra turns, then run again.
+  </p>
+  <pre><code>cortex --prompt "fix the failing report total" --verify "python3 -m pytest -q" --repair-attempts 1</code></pre>
+  <p>
+    The extra turn only happens on failure, so cheap smoke tasks do not pay repair tokens when the
+    first answer is already correct.
+  </p>
+
   <h2>Cancellation</h2>
   <p>
     In non-interactive mode, <code>Ctrl-C</code> ends the process — the ordinary expectation for a

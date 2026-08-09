@@ -28,6 +28,22 @@ const slug = 'reference/cli';
         </td>
       </tr>
       <tr>
+        <td><code>--verify &lt;command&gt;</code></td>
+        <td>—</td>
+        <td>
+          After <code>--prompt</code>, run a verifier command in the working directory. If it fails,
+          cortex exits non-zero unless <code>--repair-attempts</code> allows another turn.
+        </td>
+      </tr>
+      <tr>
+        <td><code>--repair-attempts &lt;n&gt;</code></td>
+        <td><code>0</code></td>
+        <td>
+          Number of extra repair turns allowed after <code>--verify</code> fails. The verifier runs
+          again after each repair.
+        </td>
+      </tr>
+      <tr>
         <td><code>--version</code></td>
         <td>—</td>
         <td>Print the version, commit and build date, then exit.</td>
@@ -41,6 +57,7 @@ const slug = 'reference/cli';
     <tbody>
       <tr><td><code>cortex</code></td><td>Interactive (the TUI)</td></tr>
       <tr><td><code>cortex --prompt "…"</code></td><td>Non-interactive (one turn, then exit)</td></tr>
+      <tr><td><code>cortex --prompt "…" --verify "go test ./..."</code></td><td>Non-interactive with objective verification</td></tr>
       <tr><td><code>cortex --version</code></td><td>Version only</td></tr>
     </tbody>
   </table>

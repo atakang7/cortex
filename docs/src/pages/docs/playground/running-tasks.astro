@@ -30,12 +30,20 @@ const slug = 'playground/running-tasks';
       <code>$PATH</code>. The whole point is to test the code you're working on.
     </li>
     <li>
+      It detects the seed project's verifier and passes it to cortex with <code>--verify</code>
+      and one repair attempt by default.
+    </li>
+    <li>
       It runs cortex non-interactively on <code>tasks/&lt;task&gt;/TASK.txt</code>, writing stdout
       and stderr to the run directory.
     </li>
     <li>
       cortex announces its trace file on stderr; <code>run.sh</code> copies it into the run
       directory so the directory is self-contained once the cache is cleaned.
+    </li>
+    <li>
+      It runs the seed project's verifier (<code>go test ./...</code>, <code>python -m pytest -q</code>,
+      or <code>npm test</code>) and records the result.
     </li>
     <li>
       It stages all changes and writes <code>diff.patch</code> — staged so files the agent created
@@ -51,7 +59,20 @@ const slug = 'playground/running-tasks';
 ├── diff.patch      # exactly what the agent changed
 ├── stdout.txt      # the agent's answer (stdout)
 ├── stderr.txt      # notices, tool activity, errors
+├── verify.status   # verifier exit status
+├── verify_stdout.txt
+├── verify_stderr.txt
 └── status.txt      # git status of the work tree</code></pre>
+
+  <h2>Batch runs</h2>
+  <pre><code>./batch.sh -n 3 report pipeline</code></pre>
+  <p>
+    Batch runs keep going after failures and write a markdown summary under <code>runs/</code>.
+    Use this for prompt or tool changes so one unlucky run does not hide the rest of the suite.
+  </p>
+  <p>
+    Set <code>PLAYGROUND_REPAIR_ATTEMPTS=0</code> when you want to measure one unaided turn.
+  </p>
 
   <div class="callout tip">
     <span class="ico">💡</span>
