@@ -3,7 +3,7 @@ import Layout from './Layout.astro';
 import { nav } from '../nav';
 import ThemeToggle from '../components/ThemeToggle.astro';
 const { slug, title } = Astro.props;
-const base = '/docs';
+const base = '/cortex/docs';
 ---
 <Layout title={title} description="cortex documentation">
   <div class="docs-shell">
@@ -11,7 +11,7 @@ const base = '/docs';
     <aside class="docs-sidebar" aria-label="Documentation navigation">
       <div class="sb-brand">
         <span class="glyph" aria-hidden="true">◆</span>
-        <a href="/">cortex</a>
+        <a href="/cortex/">cortex</a>
         <span class="sb-toggle"><ThemeToggle /></span>
       </div>
       <nav aria-label="Docs sections">
