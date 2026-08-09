@@ -112,6 +112,24 @@ func run() error {
 		fmt.Fprintf(os.Stderr, "cortex: trace: %s\n", path)
 	}
 
+	// Tapping the models here, at the one place they are resolved, is what
+	// puts the actual prompts in the trace. Both are tapped: the curator's
+	// context decisions are as worth auditing as the agent's, and they are
+	// invisible in the event stream, which only reports how many tokens a
+	// pass moved and never why.
+	model = trace.Wiretap("main", model)
+	prunerModel = trace.Wiretap("pruner", prunerModel)
+
+	cwd, _ := os.Getwd()
+	trace.Describe(ui.RunInfo{
+		Version:        version,
+		Provider:       cfg.Provider,
+		Model:          cfg.ModelName,
+		PrunerProvider: cfg.Pruner.Provider,
+		PrunerModel:    cfg.Pruner.Model,
+		Cwd:            cwd,
+	})
+
 	if *prompt != "" {
 		return runOnce(cfg, settings, model, prunerModel, trace, *prompt)
 	}
@@ -131,7 +149,10 @@ func runInteractive(cfg config.Config, settings axon.Settings, model axon.Model,
 
 	bridge := &ui.Bridge{}
 
-	agent, err := newAgent(cfg, settings, model, prunerModel, fanOut(bridge.Emit, trace.Emit))
+	// Unbounded: a human is watching, and Ctrl-C ends a turn that has lost
+	// its way. See maxIterationsOnce for why -prompt is not given the same
+	// freedom.
+	agent, err := newAgent(cfg, settings, model, prunerModel, fanOut(bridge.Emit, trace.Emit), 0)
 	if err != nil {
 		return err
 	}
@@ -156,7 +177,7 @@ func runOnce(cfg config.Config, settings axon.Settings, model axon.Model, pruner
 	renderer := ui.NewPlain(os.Stdout, os.Stderr)
 	defer renderer.Close()
 
-	agent, err := newAgent(cfg, settings, model, prunerModel, fanOut(renderer.Emit, trace.Emit))
+	agent, err := newAgent(cfg, settings, model, prunerModel, fanOut(renderer.Emit, trace.Emit), maxIterationsOnce)
 	if err != nil {
 		return err
 	}
@@ -184,21 +205,43 @@ func fanOut(sinks ...func(context.Context, axon.Event)) func(context.Context, ax
 	}
 }
 
+// maxIterationsOnce bounds how many model calls a single non-interactive run
+// may make.
+//
+// Interactive sessions are deliberately unbounded: a human is watching and
+// Ctrl-C ends a turn that has lost its way. -prompt has neither. Without a
+// bound, a model that keeps calling tools and never answers spends the user's
+// budget until something else kills the process, which is the failure mode
+// axon.Config.MaxIterations exists to prevent and which every unattended
+// embedder is told to guard against.
+//
+// The number is chosen to be far above any real task — traced runs of a
+// multi-file feature settle around a dozen calls — so reaching it means the
+// loop is stuck, not that the work was large.
+const maxIterationsOnce = 120
+
 // newAgent constructs the runtime. Both modes go through here so they cannot
-// drift into configuring the agent differently.
-func newAgent(cfg config.Config, settings axon.Settings, model axon.Model, prunerModel axon.Model, onEvent func(context.Context, axon.Event)) (*axon.Agent, error) {
+// drift into configuring the agent differently; what legitimately differs
+// between them is passed in.
+func newAgent(cfg config.Config, settings axon.Settings, model axon.Model, prunerModel axon.Model, onEvent func(context.Context, axon.Event), maxIterations int) (*axon.Agent, error) {
 	servers := make([]axon.MCPServer, 0, len(cfg.MCPServers))
 	for _, s := range cfg.MCPServers {
 		servers = append(servers, axon.MCPServer{Command: s.Command, Args: s.Args, Env: s.Env})
 	}
 
 	return axon.New(axon.Config{
-		Model:        model,
-		SystemPrompt: cfg.SystemPrompt,
-		MCPServers:   servers,
-		OnEvent:      onEvent,
-		Settings:     settings,
-		Pruner:       prunerModel,
+		Model:         model,
+		SystemPrompt:  cfg.SystemPrompt,
+		MCPServers:    servers,
+		OnEvent:       onEvent,
+		Settings:      settings,
+		Pruner:        prunerModel,
+		MaxIterations: maxIterations,
+		// The same model that answers turns also names them. A title request
+		// is one cheap, tool-free call on turn 1; a dedicated model is not
+		// worth a second config knob. If the call fails, axon falls back to
+		// the deterministic truncation, so this can never break a turn.
+		TitleModel: model,
 	})
 }
 
