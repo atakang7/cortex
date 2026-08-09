@@ -18,6 +18,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: docs/readme-real-ui
+          fetch-depth: 0
 
       - uses: actions/setup-go@v5
         with:
@@ -45,4 +46,5 @@ jobs:
             exit 0
           fi
           git commit -m "docs: refresh real Cortex terminal demo"
+          git pull --rebase origin docs/readme-real-ui
           git push origin HEAD:docs/readme-real-ui
