@@ -1,16 +1,15 @@
 ---
 import ThemeToggle from '../components/ThemeToggle.astro';
 const { title, description } = Astro.props;
-const canonical = new URL(Astro.url.pathname, Astro.site ?? 'https://cortex.dev').toString();
+const canonical = new URL(Astro.url.pathname, Astro.site ?? 'https://atakang7.github.io').toString();
 ---
 <!doctype html>
-<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>{title}</title>
   <meta name="description" content={description} />
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="icon" type="image/svg+xml" href="/cortex/favicon.svg" />
   <link rel="canonical" href={canonical} />
   <!-- No-FOUC: set theme before first paint -->
   <script is:inline>

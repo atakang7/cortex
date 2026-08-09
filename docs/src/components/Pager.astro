@@ -6,13 +6,13 @@ const prev = i > 0 ? flat[i - 1] : null;
 const next = i >= 0 && i < flat.length - 1 ? flat[i + 1] : null;
 ---
 {prev && (
-  <a class="pager prev" href={`/docs/${prev.slug}/`}>
+  <a class="pager prev" href={`/cortex/docs/${prev.slug}/`}>
     <span class="pager-dir">← Previous</span>
     <span class="pager-title">{prev.title}</span>
   </a>
 )}
 {next && (
-  <a class="pager next" href={`/docs/${next.slug}/`}>
+  <a class="pager next" href={`/cortex/docs/${next.slug}/`}>
     <span class="pager-dir">Next →</span>
     <span class="pager-title">{next.title}</span>
   </a>

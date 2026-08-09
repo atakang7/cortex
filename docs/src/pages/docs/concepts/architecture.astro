@@ -73,7 +73,7 @@ const slug = 'concepts/architecture';
     The tool catalog is appended by <a href="https://atakang7.github.io/axon/tools/builtins/">axon</a>,
     natively, to every request. If a custom <code>system_prompt</code> also enumerates the tools, the
     model sees the catalog twice — and you pay for those duplicated tokens on every single call.
-    This is exactly the kind of thing the <a href="/docs/concepts/trace-log/">trace log</a> was built
+    This is exactly the kind of thing the <a href="/cortex/docs/concepts/trace-log/">trace log</a> was built
     to catch: a <code>~2,100-token</code> duplication that was invisible in the event stream and
     obvious in the wire log.
   </p>

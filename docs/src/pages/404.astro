@@ -1,12 +1,13 @@
 ---
 import Layout from '../layouts/Layout.astro';
+const title = "404 — cortex";
 ---
-<Layout title="404 — cortex" description="Page not found">
+<Layout title={title} description="Page not found">
 <section style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px;">
   <div style="font-size:clamp(48px,10vw,96px);font-weight:800;letter-spacing:-0.03em;background:linear-gradient(120deg,var(--accent),var(--accent-2));-webkit-background-clip:text;background-clip:text;color:transparent;">404</div>
   <p style="color:var(--text-dim);font-size:19px;margin:18px 0 32px;max-width:420px;">
     This page took a wrong turn. The trace log won't help here.
   </p>
-  <a class="btn btn-primary" href="/" style="display:inline-flex;align-items:center;gap:8px;padding:13px 26px;border-radius:999px;font-weight:600;color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent-2));text-decoration:none;">← Back home</a>
+  <a class="btn btn-primary" href="/cortex/" style="display:inline-flex;align-items:center;gap:8px;padding:13px 26px;border-radius:999px;font-weight:600;color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent-2));text-decoration:none;">← Back home</a>
 </section>
 </Layout>

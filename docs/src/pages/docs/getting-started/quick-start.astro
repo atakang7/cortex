@@ -26,7 +26,7 @@ cortex --version</code></pre>
     everything else — tool activity, notices, errors — to <strong>stderr</strong>, so it composes:
   </p>
   <pre><code>cortex --prompt "list every exported function in internal/ui" > api.txt</code></pre>
-  <p>See <a href="/docs/guides/non-interactive/">Non-interactive mode</a> for the full picture.</p>
+  <p>See <a href="/cortex/docs/guides/non-interactive/">Non-interactive mode</a> for the full picture.</p>
 
   <h2>A config file for repeat use</h2>
   <p>If you don't want to pass env vars every time, write a config file:</p>
@@ -37,7 +37,7 @@ model:
   api_key: $OPENROUTER_API_KEY</code></pre>
   <p>
     The <code>$</code> prefix reads the value from an environment variable at startup, so you
-    never commit the key itself. See <a href="/docs/guides/configuration/">Configuration</a>
+    never commit the key itself. See <a href="/cortex/docs/guides/configuration/">Configuration</a>
     for the full three-layer cascade.
   </p>
 
