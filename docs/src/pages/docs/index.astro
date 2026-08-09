@@ -1,0 +1,63 @@
+---
+import Doc from '../../layouts/Doc.astro';
+import { nav } from '../../nav';
+const allPages = nav.flatMap((s) => s.pages);
+---
+<Doc slug="" title="cortex documentation">
+  <h1>cortex documentation</h1>
+  <p class="lede">
+    A terminal coding agent built on the <a href="https://github.com/atakang7/axon">axon</a> runtime.
+    Streaming chat, tool dispatch, append-only sessions, and secondary-LLM context pruning —
+    all from your terminal.
+  </p>
+
+  <div class="taxonomy">
+    <h2>Documentation map</h2>
+    <pre class="tree">cortex/
+├── getting-started/
+│   ├── install              — go install · pre-built binaries · build from source
+│   └── quick-start          — env vars · interactive & non-interactive · first config
+├── guides/
+│   ├── configuration        — the three-layer cascade · fields · known providers
+│   ├── interactive          — the transcript · Ctrl-C · the banner
+│   ├── non-interactive      — stdout/stderr split · iteration limits · piping
+│   ├── commands             — /new · /undo · /cd · /session · /help · /quit
+│   └── keyboard             — every key the terminal binds
+├── concepts/
+│   ├── architecture         — axon owns the loop · cortex owns the product · two boundary rules
+│   ├── pruner               — the secondary model · what it sees · when to skip it
+│   ├── trace-log            — the third event sink · both models tapped · why it exists
+│   └── mcp-servers          — MCP protocol · auto-discovery · multiple servers
+├── playground/
+│   ├── overview             — run.sh & trace.sh · the run directory · the six views
+│   ├── running-tasks        — step by step · what a run keeps · comparing runs
+│   ├── reading-traces       — timeline · prompt · system · tools · usage · errors
+│   └── tasks                — ledger · report · pipeline · what the playground found
+└── reference/
+    ├── cli                  — --config · --prompt · --version · exit codes
+    ├── config-file          — every field · pruner · mcp_servers · env overrides
+    └── api-keys             — resolution order · providers.json · the leading $</pre>
+  </div>
+
+  <h2>Start here</h2>
+  <p>
+    New to cortex? Begin with <a href="/docs/getting-started/install/">Install</a>, then
+    <a href="/docs/getting-started/quick-start/">Quick start</a>. Once you're running, read
+    <a href="/docs/concepts/architecture/">Architecture</a> to understand the layering before you
+    change anything.
+  </p>
+
+  <h2>Quick links</h2>
+  <div class="quick-grid">
+    {nav.map((sec) => (
+      <div class="quick-card">
+        <div class="quick-title">{sec.label}</div>
+        <ul>
+          {sec.pages.map((p) => (
+            <li><a href={`/docs/${p.slug}/`}>{p.title}</a></li>
+          ))}
+        </ul>
+      </div>
+    ))}
+  </div>
+</Doc>

@@ -1,0 +1,87 @@
+---
+import Doc from '../../../layouts/Doc.astro';
+import Pager from '../../../components/Pager.astro';
+const slug = 'playground/running-tasks';
+---
+<Doc slug={slug} title="Running tasks">
+  <h1>Running tasks</h1>
+  <p class="lede"><code>run.sh</code> drives cortex through one playground task and keeps everything it did.</p>
+
+  <h2>Usage</h2>
+  <pre><code>./run.sh &lt;task&gt; [label]</code></pre>
+
+  <h2>What happens, step by step</h2>
+  <ol>
+    <li>
+      <code>run.sh ledger iter1</code> copies <code>tasks/ledger/seed</code> into
+      <code>runs/ledger-iter1/work</code>.
+    </li>
+    <li>
+      It commits the seed in a fresh per-run git repo. <code>git diff</code> in the work directory
+      is then <em>exactly</em> what the agent changed, with no other setup.
+    </li>
+    <li>
+      A <code>.gitignore</code> is written so build artefacts (<code>__pycache__/</code>,
+      <code>*.pyc</code>, <code>.pytest_cache/</code>) don't fill the diff with binary noise and bury
+      the one source change that matters.
+    </li>
+    <li>
+      It builds the cortex in the working tree — <strong>not</strong> whatever was on
+      <code>$PATH</code>. The whole point is to test the code you're working on.
+    </li>
+    <li>
+      It detects the seed project's verifier and passes it to cortex with <code>--verify</code>
+      and one repair attempt by default.
+    </li>
+    <li>
+      It runs cortex non-interactively on <code>tasks/&lt;task&gt;/TASK.txt</code>, writing stdout
+      and stderr to the run directory.
+    </li>
+    <li>
+      cortex announces its trace file on stderr; <code>run.sh</code> copies it into the run
+      directory so the directory is self-contained once the cache is cleaned.
+    </li>
+    <li>
+      It runs the seed project's verifier (<code>go test ./...</code>, <code>python -m pytest -q</code>,
+      or <code>npm test</code>) and records the result.
+    </li>
+    <li>
+      It stages all changes and writes <code>diff.patch</code> — staged so files the agent created
+      show up as additions rather than untracked paths the patch never mentions.
+    </li>
+  </ol>
+
+  <h2>The run directory</h2>
+  <pre><code>runs/ledger-iter1/
+├── work/           # pristine seed copy + the agent's changes
+├── cortex          # the freshly-built binary
+├── trace.jsonl     # the wire-level record
+├── diff.patch      # exactly what the agent changed
+├── stdout.txt      # the agent's answer (stdout)
+├── stderr.txt      # notices, tool activity, errors
+├── verify.status   # verifier exit status
+├── verify_stdout.txt
+├── verify_stderr.txt
+└── status.txt      # git status of the work tree</code></pre>
+
+  <h2>Batch runs</h2>
+  <pre><code>./batch.sh -n 3 report pipeline</code></pre>
+  <p>
+    Batch runs keep going after failures and write a markdown summary under <code>runs/</code>.
+    Use this for prompt or tool changes so one unlucky run does not hide the rest of the suite.
+  </p>
+  <p>
+    Set <code>PLAYGROUND_REPAIR_ATTEMPTS=0</code> when you want to measure one unaided turn.
+  </p>
+
+  <div class="callout tip">
+    <span class="ico">💡</span>
+    <div class="callout-body">
+      <strong>Comparing runs:</strong> because the seed is never touched and each run is
+      self-contained, two runs are directly comparable. Diff the <code>diff.patch</code> files, or
+      compare <code>trace.jsonl</code> with the <a href="/docs/playground/reading-traces/">trace views</a>.
+    </div>
+  </div>
+
+  <div class="docs-pager"><Pager slug={slug} /></div>
+</Doc>

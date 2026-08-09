@@ -1,0 +1,109 @@
+---
+import Doc from '../../../layouts/Doc.astro';
+import Pager from '../../../components/Pager.astro';
+const slug = 'concepts/architecture';
+---
+<Doc slug={slug} title="Architecture">
+  <h1>Architecture</h1>
+  <p class="lede">axon owns the loop. cortex owns the product on top. Layers point one direction.</p>
+
+  <!-- Layer diagram -->
+  <div class="layer-diagram">
+    <div class="layer layer-cortex">
+      <div class="layer-tag">cortex — the product</div>
+      <div class="layer-rows">
+        <div class="layer-row">
+          <div class="mod-card"><span class="mod-name">main.go</span><span class="mod-desc">flags · wiring · mode dispatch</span></div>
+          <div class="mod-card accent"><span class="mod-name">config</span><span class="mod-desc">resolve model · prompt · MCP</span></div>
+          <div class="mod-card accent"><span class="mod-name">ui</span><span class="mod-desc">terminal · transcript · commands</span></div>
+        </div>
+        <div class="layer-note">config &amp; theme are leaves · ui owns the terminal · main only wires</div>
+      </div>
+    </div>
+    <div class="layer-gap"><span class="gap-label">the only seam</span></div>
+    <div class="layer layer-axon">
+      <div class="layer-tag">axon — the runtime <a class="ext-link" href="https://atakang7.github.io/axon/">↗ docs</a></div>
+      <div class="layer-rows">
+        <div class="layer-row">
+          <div class="mod-card axon"><span class="mod-name">loop</span><span class="mod-desc">streaming chat · tool dispatch</span></div>
+          <div class="mod-card axon"><span class="mod-name">session</span><span class="mod-desc">append-only · byte-for-byte undo</span></div>
+          <div class="mod-card axon"><span class="mod-name">pruner</span><span class="mod-desc">secondary-LLM context parking</span></div>
+          <div class="mod-card axon"><span class="mod-name">tools</span><span class="mod-desc">7 built-ins · MCP auto-discovery</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2>The two boundary rules</h2>
+  <div class="rules-grid">
+    <div class="rule-card">
+      <div class="rule-num">1</div>
+      <div class="rule-text">
+        <strong><code>internal/config</code> imports nothing else from this module.</strong>
+        It is a leaf. If a value there needs a type from a higher layer, it belongs in that layer.
+      </div>
+    </div>
+    <div class="rule-card">
+      <div class="rule-num">2</div>
+      <div class="rule-text">
+        <strong><code>internal/ui/event.go</code> is the only file that touches both axon and Bubble Tea.</strong>
+        axon calls its event handler synchronously on the turn goroutine; Bubble Tea owns the terminal from its own. Nothing else may cross that line.
+      </div>
+    </div>
+  </div>
+
+  <h2>What <code>main.go</code> wires</h2>
+  <p>
+    <code>main.go</code> is wiring and nothing else. Every decision it makes is delegated:
+    configuration to <code>internal/config</code>, presentation to <code>internal/ui</code>, and the
+    loop itself to <a href="https://atakang7.github.io/axon/">axon</a>.
+  </p>
+  <div class="wire-flow">
+    <div class="wire-step"><div class="wire-ico">⚓</div><div class="wire-t">Parse flags</div><div class="wire-d">interactive · non-interactive · version</div></div>
+    <div class="wire-arrow">→</div>
+    <div class="wire-step"><div class="wire-ico">⚙️</div><div class="wire-t">Load config</div><div class="wire-d">resolve model &amp; pruner vs axon Settings</div></div>
+    <div class="wire-arrow">→</div>
+    <div class="wire-step"><div class="wire-ico">📡</div><div class="wire-t">Tap models</div><div class="wire-d">trace wiretap on main + pruner</div></div>
+    <div class="wire-arrow">→</div>
+    <div class="wire-step"><div class="wire-ico">▶</div><div class="wire-t">Run loop</div><div class="wire-d">build axon Options · attach handler · go</div></div>
+  </div>
+
+  <h2>Why the system prompt must not list tools</h2>
+  <p>
+    The tool catalog is appended by <a href="https://atakang7.github.io/axon/tools/builtins/">axon</a>,
+    natively, to every request. If a custom <code>system_prompt</code> also enumerates the tools, the
+    model sees the catalog twice — and you pay for those duplicated tokens on every single call.
+    This is exactly the kind of thing the <a href="/docs/concepts/trace-log/">trace log</a> was built
+    to catch: a <code>~2,100-token</code> duplication that was invisible in the event stream and
+    obvious in the wire log.
+  </p>
+
+  <h2>Why the transcript isn't an alternate screen</h2>
+  <div class="compare">
+    <div class="compare-card bad">
+      <div class="compare-tag">alternate screen</div>
+      <div class="compare-body">
+        Vanishes on exit. The session is gone the moment cortex stops — nothing to scroll, search or copy.
+      </div>
+    </div>
+    <div class="compare-card good">
+      <div class="compare-tag">committed scrollback</div>
+      <div class="compare-body">
+        Stays in your terminal's own scrollback. A finished session is scrollable, searchable and copyable — even after cortex exits. Only work in flight redraws.
+      </div>
+    </div>
+  </div>
+
+  <div class="callout info">
+    <span class="ico">📖</span>
+    <div class="callout-body">
+      <strong>Deeper into axon:</strong> the loop, session, pruner and tools are all axon's. Read
+      <a href="https://atakang7.github.io/axon/internals/architecture/">axon's architecture</a>,
+      <a href="https://atakang7.github.io/axon/runtime/context/">context management</a>, and
+      <a href="https://atakang7.github.io/axon/tools/builtins/">the built-in tools</a> for the layer
+      cortex builds on.
+    </div>
+  </div>
+
+  <div class="docs-pager"><Pager slug={slug} /></div>
+</Doc>

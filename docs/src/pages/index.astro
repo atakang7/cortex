@@ -1,0 +1,286 @@
+---
+import Layout from '../layouts/Layout.astro';
+import ThemeToggle from '../components/ThemeToggle.astro';
+---
+<Layout title="cortex — a terminal coding agent" description="A terminal coding agent built on the axon runtime. Streaming chat, tool dispatch, append-only sessions, and secondary-LLM context pruning — all from your terminal.">
+
+<!-- Nav -->
+<nav class="landing-nav" id="nav" aria-label="Primary">
+  <div class="nav-brand">
+    <span class="glyph" aria-hidden="true">◆</span> cortex
+  </div>
+  <ul class="nav-links">
+    <li><a href="/docs/">Docs</a></li>
+    <li><a href="/docs/getting-started/install">Install</a></li>
+    <li><a href="/docs/concepts/architecture">Architecture</a></li>
+    <li><a href="/docs/playground/overview">Playground</a></li>
+    <li><a href="https://github.com/atakang7/cortex" rel="noopener">GitHub ↗</a></li>
+  </ul>
+  <div class="nav-actions">
+    <ThemeToggle />
+    <a class="nav-cta" href="/docs/getting-started/quick-start">Get started</a>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero" aria-labelledby="hero-title">
+  <div class="hero-bg" aria-hidden="true">
+    <div class="hero-grid"></div>
+    <div class="hero-glow one"></div>
+    <div class="hero-glow two"></div>
+    <div class="hero-glow three"></div>
+  </div>
+  <div class="hero-content">
+    <div class="hero-badge">
+      <span class="dot" aria-hidden="true"></span> built on the axon runtime
+    </div>
+    <h1 class="hero-title" id="hero-title">
+      The coding agent that lives<br/>
+      <span class="gradient">in your terminal.</span>
+    </h1>
+    <p class="hero-sub">
+      <strong>cortex</strong> streams the model, dispatches tools, persists an append-only
+      session, and prunes its own context under pressure — then gets out of your way.
+      No Electron. No browser tab. Just a transcript you can scroll, search and copy.
+    </p>
+    <div class="hero-actions">
+      <a class="btn btn-primary" href="/docs/getting-started/quick-start">
+        Get started →
+      </a>
+      <a class="btn btn-ghost" href="https://github.com/atakang7/cortex">
+        View on GitHub
+      </a>
+    </div>
+
+    <!-- Terminal mockup -->
+    <div class="terminal-mock" role="img" aria-label="cortex terminal session: editing internal/ui/view.go and theme.go, running tests, passing">
+      <div class="terminal-window">
+        <div class="terminal-bar" aria-hidden="true">
+          <span class="terminal-dot r"></span>
+          <span class="terminal-dot y"></span>
+          <span class="terminal-dot g"></span>
+          <span class="terminal-title">cortex — internal/ui</span>
+        </div>
+        <div class="terminal-body" id="term" aria-hidden="true">
+          <div class="t-line"><span class="t-notice">  session started · openrouter/deepseek-v3.2 · pruner on</span></div>
+          <div class="t-line"><span class="t-notice">  turn 1 started</span></div>
+          <div class="t-line"><span class="t-user"><span class="t-mark">❯</span> add a spinner to the waiting state</span></div>
+          <div class="t-line"><span class="t-notice">  turn 1 · calling model...</span></div>
+          <div class="t-line"><span class="t-rail">  ▐</span> <span class="t-toolname">read</span>  <span class="t-toolargs">internal/ui/view.go</span></div>
+          <div class="t-line"><span class="t-rail">  │</span> <span class="t-toolargs">// waiting is what the user sees between submitting and first output.</span></div>
+          <div class="t-line"><span class="t-rail">  │</span> <span class="t-toolargs">func (m Model) waiting() string &#123;</span></div>
+          <div class="t-line"><span class="t-rail">  └</span> <span class="t-ok">✓ 3 lines</span></div>
+          <div class="t-line"><span class="t-rail">  ▐</span> <span class="t-toolname">read</span>  <span class="t-toolargs">internal/ui/theme.go</span></div>
+          <div class="t-line"><span class="t-rail">  └</span> <span class="t-ok">✓ 68 lines</span></div>
+          <div class="t-line"><span class="t-rail">  ▐</span> <span class="t-toolname">write</span>  <span class="t-toolargs">internal/ui/view.go  save</span></div>
+          <div class="t-line"><span class="t-rail">  └</span> <span class="t-ok">✓ ok</span></div>
+          <div class="t-line"><span class="t-rail">  ▐</span> <span class="t-toolname">exec</span>  <span class="t-toolargs">go test ./internal/ui/...</span></div>
+          <div class="t-line"><span class="t-rail">  │</span> <span class="t-toolargs">ok  github.com/atakang7/cortex/internal/ui  0.31s</span></div>
+          <div class="t-line"><span class="t-rail">  └</span> <span class="t-ok">✓ 1 line</span></div>
+          <div class="t-line"><span class="t-assistant">  Added a MiniDot spinner to waiting(). It ticks on the</span></div>
+          <div class="t-line"><span class="t-assistant">  turn goroutine and stops on first output.</span></div>
+          <div class="t-line"><span class="t-notice">  turn 1 ended</span></div>
+          <div class="t-line t-status"><span class="t-st">deepseek-v3.2</span><span class="t-st"> · </span><span class="t-st-pruner">pruner: llama-3.1-8b</span><span class="t-st"> · </span><span class="t-st">cortex/internal/ui</span><span class="t-st"> · </span><span class="t-st">turn 1</span><span class="t-st"> · </span><span class="t-st">ctx 12040</span><span class="t-st"> · </span><span class="t-st">tokens 12040↑ 340↓</span></div>
+          <div class="t-inputbox">
+            <div class="t-inputrow"><span class="t-mark">❯</span><span class="t-cursor"></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Stats -->
+<div class="stats">
+  <div class="stat"><div class="stat-num">7</div><div class="stat-label">built-in tools</div></div>
+  <div class="stat"><div class="stat-num">∞</div><div class="stat-label">session scrollback</div></div>
+  <div class="stat"><div class="stat-num">2</div><div class="stat-label">LLMs · main + pruner</div></div>
+  <div class="stat"><div class="stat-num">1</div><div class="stat-label">binary · zero deps</div></div>
+</div>
+
+<!-- Features -->
+<section class="section">
+  <div class="section-head">
+    <div class="section-eyebrow">why cortex</div>
+    <h2 class="section-title">A loop, a product, and a terminal.</h2>
+    <p class="section-sub">
+      axon ships the loop. cortex ships the product on top — the config, the role text,
+      and the terminal it talks through. Everything layers one direction.
+    </p>
+  </div>
+  <div class="features">
+    <div class="feature">
+      <div class="feature-icon">⌘</div>
+      <div class="feature-title">Committed scrollback</div>
+      <div class="feature-desc">
+        The transcript writes to your terminal's own scrollback — not an alternate screen.
+        A finished session stays scrollable, searchable and copyable, even after cortex exits.
+      </div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">✂</div>
+      <div class="feature-title">Self-pruning context</div>
+      <div class="feature-desc">
+        A cheap secondary model parks stale context so the main model stays under its window.
+        Old blocks are summarized, not dropped — you keep the thread without paying for it twice.
+      </div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">⟳</div>
+      <div class="feature-title">Append-only sessions</div>
+      <div class="feature-desc">
+        Every turn is persisted as it happens. Undo a file edit byte for byte, resume a session,
+        or audit exactly what the agent did and when.
+      </div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🔌</div>
+      <div class="feature-title">MCP, auto-discovered</div>
+      <div class="feature-desc">
+        Spawn any Model Context Protocol server at startup and its tools are wired in
+        automatically — GitHub, filesystems, databases, anything that speaks MCP.
+      </div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">⌗</div>
+      <div class="feature-title">Composable non-interactive mode</div>
+      <div class="feature-desc">
+        <code>--prompt</code> writes the answer to stdout and everything else to stderr,
+        so cortex pipes cleanly into scripts: <code>cortex --prompt "…" > out.txt</code>
+      </div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🔭</div>
+      <div class="feature-title">Wire-level traces</div>
+      <div class="feature-desc">
+        Every request and reply is logged to a trace file — the composed system prompt, the
+        windowed conversation, the pruner's curator calls. Prompt-engineer against reality.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Pipeline -->
+<section class="section" style="padding-top:0;">
+  <div class="section-head">
+    <div class="section-eyebrow">how it works</div>
+    <h2 class="section-title">One turn, four moves.</h2>
+    <p class="section-sub">
+      cortex plans, reads, edits and verifies — then stops. The loop is deliberately tight:
+      a turn that ends with only a plan has produced nothing.
+    </p>
+  </div>
+  <div class="pipeline">
+    <div class="pipe-step">
+      <div class="pipe-num">01</div>
+      <div class="pipe-icon">🗺️</div>
+      <div class="pipe-title">Plan</div>
+      <div class="pipe-desc">State the shape of the work before it's expensive to change your mind.</div>
+    </div>
+    <div class="pipe-step">
+      <div class="pipe-num">02</div>
+      <div class="pipe-icon">📖</div>
+      <div class="pipe-title">Read</div>
+      <div class="pipe-desc">Search before you read, read before you write. No guessing paths.</div>
+    </div>
+    <div class="pipe-step">
+      <div class="pipe-num">03</div>
+      <div class="pipe-icon">✏️</div>
+      <div class="pipe-title">Edit</div>
+      <div class="pipe-desc">Change files in place. Atomic, recorded, revertable byte for byte.</div>
+    </div>
+    <div class="pipe-step">
+      <div class="pipe-num">04</div>
+      <div class="pipe-icon">✅</div>
+      <div class="pipe-title">Verify</div>
+      <div class="pipe-desc">Run the thing that proves it — the test, the build, the command.</div>
+    </div>
+  </div>
+</section>
+
+<!-- Showcase -->
+<section class="section" style="padding-top:0;">
+  <div class="showcase">
+    <div class="showcase-text">
+      <h3>Config that layers, not sprawls.</h3>
+      <p>
+        Three sources, each overriding the last. Your user config holds defaults, a project
+        config overrides per-repo, and the environment overrides both — field by field.
+      </p>
+      <ul class="showcase-list">
+        <li><span class="check">✓</span> <span>A project config that names only a model keeps the API key from your user config.</span></li>
+        <li><span class="check">✓</span> <span>Known providers supply a default <code>base_url</code> automatically.</span></li>
+        <li><span class="check">✓</span> <span>A <code>$</code>-prefixed <code>api_key</code> reads straight from the environment.</span></li>
+        <li><span class="check">✓</span> <span>One shared <code>providers.json</code> across every axon-family tool.</span></li>
+      </ul>
+    </div>
+    <div class="code-block">
+<pre><span class="c-com"># ~/.config/cortex/config.yaml</span>
+<span class="c-key">name</span>: reviewer
+
+<span class="c-key">provider</span>: openrouter
+<span class="c-key">model</span>: deepseek/deepseek-v3.2
+
+<span class="c-key">pruner</span>:
+  <span class="c-key">model</span>: meta-llama/llama-3.1-8b
+
+<span class="c-key">mcp_servers</span>:
+  <span class="c-key">github</span>:
+    <span class="c-key">command</span>: docker
+    <span class="c-key">args</span>: [<span class="c-str">"run"</span>, <span class="c-str">"-i"</span>, <span class="c-str">"--rm"</span>,
+           <span class="c-str">"ghcr.io/github/github-mcp-server"</span>]
+    <span class="c-key">env</span>: [<span class="c-str">"GITHUB_TOKEN=…"</span>]</pre>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-band">
+  <h2>Ship edits, not prompts.</h2>
+  <p>Install in one command. Run in your repo. Watch it work.</p>
+  <div class="hero-actions">
+    <a class="btn btn-primary" href="/docs/getting-started/install">Install cortex →</a>
+    <a class="btn btn-ghost" href="/docs/getting-started/quick-start">Quick start</a>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <span class="glyph">◆</span> cortex
+      <span class="footer-meta" style="margin-left:12px;">MIT · built on axon</span>
+    </div>
+    <div class="footer-links">
+      <a href="/docs/">Docs</a>
+      <a href="https://github.com/atakang7/cortex">GitHub</a>
+      <a href="https://github.com/atakang7/axon">axon</a>
+      <a href="/docs/reference/cli">CLI reference</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Nav scroll state
+  const nav = document.getElementById('nav');
+  const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 20);
+  onScroll(); window.addEventListener('scroll', onScroll, { passive: true });
+
+  // Typed terminal effect — replays the last two lines as if streaming in.
+  const term = document.getElementById('term');
+  if (term) {
+    const lines = [...term.querySelectorAll('.t-line')];
+    lines.forEach(l => { l.dataset.text = l.textContent; });
+    // Reveal animation: fade lines in sequence
+    lines.forEach((l, i) => {
+      l.style.opacity = '0';
+      l.style.transform = 'translateY(6px)';
+      setTimeout(() => {
+        l.style.transition = 'opacity .3s, transform .3s';
+        l.style.opacity = '1';
+        l.style.transform = 'translateY(0)';
+      }, 600 + i * 180);
+    });
+  }
+</script>
+</Layout>

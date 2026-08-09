@@ -1,0 +1,87 @@
+---
+import Doc from '../../../layouts/Doc.astro';
+import Pager from '../../../components/Pager.astro';
+const slug = 'reference/cli';
+---
+<Doc slug={slug} title="CLI">
+  <h1>CLI reference</h1>
+  <p class="lede">cortex takes a small number of flags. Everything else lives in config.</p>
+
+  <h2>Flags</h2>
+  <table>
+    <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>--config &lt;path&gt;</code></td>
+        <td>—</td>
+        <td>
+          Path to a config file instead of the usual cascade. <strong>Disables the cascade
+          entirely</strong> — only that file is read, plus the environment.
+        </td>
+      </tr>
+      <tr>
+        <td><code>--prompt &lt;text&gt;</code></td>
+        <td>—</td>
+        <td>
+          Run one prompt non-interactively and exit. The answer goes to stdout; everything else to
+          stderr. Bounded by <code>maxIterationsOnce</code>.
+        </td>
+      </tr>
+      <tr>
+        <td><code>--verify &lt;command&gt;</code></td>
+        <td>—</td>
+        <td>
+          After <code>--prompt</code>, run a verifier command in the working directory. If it fails,
+          cortex exits non-zero unless <code>--repair-attempts</code> allows another turn.
+        </td>
+      </tr>
+      <tr>
+        <td><code>--repair-attempts &lt;n&gt;</code></td>
+        <td><code>0</code></td>
+        <td>
+          Number of extra repair turns allowed after <code>--verify</code> fails. The verifier runs
+          again after each repair.
+        </td>
+      </tr>
+      <tr>
+        <td><code>--version</code></td>
+        <td>—</td>
+        <td>Print the version, commit and build date, then exit.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Modes</h2>
+  <table>
+    <thead><tr><th>Invocation</th><th>Mode</th></tr></thead>
+    <tbody>
+      <tr><td><code>cortex</code></td><td>Interactive (the TUI)</td></tr>
+      <tr><td><code>cortex --prompt "…"</code></td><td>Non-interactive (one turn, then exit)</td></tr>
+      <tr><td><code>cortex --prompt "…" --verify "go test ./..."</code></td><td>Non-interactive with objective verification</td></tr>
+      <tr><td><code>cortex --version</code></td><td>Version only</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Exit codes</h2>
+  <ul>
+    <li><code>0</code> — normal exit</li>
+    <li><code>1</code> — an error occurred (printed to stderr as <code>cortex: &lt;error&gt;</code>)</li>
+  </ul>
+
+  <h2>Build metadata</h2>
+  <p>
+    The version, commit and build date are injected at link time by goreleaser. A source build
+    without ldflags reports <code>cortex dev (none, built unknown)</code>.
+  </p>
+
+  <div class="callout info">
+    <span class="ico">ℹ️</span>
+    <div class="callout-body">
+      <strong>Why so few flags?</strong> Configuration belongs in the
+      <a href="/docs/reference/config-file/">config file</a>, not on the command line. The only
+      flags are mode switches and the override path.
+    </div>
+  </div>
+
+  <div class="docs-pager"><Pager slug={slug} /></div>
+</Doc>

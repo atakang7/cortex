@@ -1,15 +1,17 @@
 {
-  "name": "cortex-docs",
-  "private": true,
+  "name": "docs",
   "type": "module",
+  "version": "0.0.1",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
-    "preview": "astro preview"
+    "preview": "astro preview",
+    "astro": "astro"
   },
   "dependencies": {
-    "@astrojs/starlight": "^0.41.7",
-    "astro": "^7.1.6",
-    "sharp": "^0.35.3"
+    "astro": "^7.2.0"
   }
 }
