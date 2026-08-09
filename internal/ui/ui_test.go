@@ -435,6 +435,24 @@ func TestTruncateRespectsTheLimit(t *testing.T) {
 	}
 }
 
+// Token usage accumulates across API calls and shows in the status line, so a
+// session-long readout is available without a separate command.
+func TestUsageAccumulatesAndRenders(t *testing.T) {
+	m := newTestModel(t)
+
+	m = apply(t, m, usageMsg{PromptTokens: 120, CompletionTokens: 30})
+	m = apply(t, m, usageMsg{PromptTokens: 80, CompletionTokens: 20})
+
+	if m.usage.prompt != 200 || m.usage.completion != 50 {
+		t.Fatalf("usage = %d↑ %d↓, want 200↑ 50↓", m.usage.prompt, m.usage.completion)
+	}
+
+	view := m.View()
+	if !strings.Contains(view, "tokens 200↑ 50↓") {
+		t.Errorf("view = %q, want the status line to show accumulated tokens", view)
+	}
+}
+
 // A narrow terminal must degrade, not produce negative widths that panic the
 // wrapper.
 func TestRenderingSurvivesANarrowTerminal(t *testing.T) {

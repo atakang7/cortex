@@ -37,6 +37,9 @@ type commandResult struct {
 
 	// SelectPruner tells the UI to open the pruner model selection list.
 	SelectPruner bool
+
+	// SelectSession tells the UI to open the session switcher list.
+	SelectSession bool
 }
 
 // command is one slash command.
@@ -135,6 +138,14 @@ var commands = map[string]command{
 		Help: "select a different pruner model for this session",
 		Run: func(*axon.Agent, string) commandResult {
 			return commandResult{SelectPruner: true}
+		},
+	},
+
+	"/switch": {
+		Name: "/switch",
+		Help: "switch to a different saved session",
+		Run: func(*axon.Agent, string) commandResult {
+			return commandResult{SelectSession: true}
 		},
 	},
 
