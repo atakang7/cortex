@@ -2,7 +2,7 @@
 
 # cortex
 
-### Terminal coding agent. Real filesystem. Real shell. One loop until the change is verified.
+### A terminal coding agent that works the repository until the change is proven.
 
 Built in Go · powered by [Axon](https://github.com/atakang7/axon)
 
@@ -11,19 +11,19 @@ Built in Go · powered by [Axon](https://github.com/atakang7/axon)
 [![Runtime](https://img.shields.io/badge/runtime-Axon-6366f1?style=flat-square)](https://github.com/atakang7/axon)
 [![License](https://img.shields.io/github/license/atakang7/cortex?style=flat-square)](LICENSE)
 
-**Search → read → edit → verify → stop.**
+**Search → read → edit → verify → keep going if the evidence says you're wrong.**
 
 [Quickstart](https://atakang7.github.io/cortex/) · [Releases](https://github.com/atakang7/cortex/releases/latest) · [Axon runtime](https://github.com/atakang7/axon)
 
 </div>
 
 <p align="center">
-  <img src="assets/cortex-live.gif" alt="A recording of the real Cortex binary searching, reading, editing, and testing a disposable Go repository" width="100%" />
+  <img src="assets/cortex-live.gif" alt="The real Cortex binary running in a terminal, searching, reading, editing, and testing a disposable Go repository" width="100%" />
 </p>
 
-<p align="center"><sub><b>This is the real Cortex binary running.</b> The model endpoint is deterministic so the recording is reproducible; the Bubble Tea UI, Axon turn loop, repository search, file read, atomic write, and <code>go test ./...</code> execution are real.</sub></p>
+<p align="center"><sub><b>Real Cortex binary. Real TUI. Real filesystem tools. Real <code>go test ./...</code>.</b> Only the local model endpoint is scripted so this recording is deterministic and reproducible.</sub></p>
 
-Cortex is a coding agent for repository work, not a chat box that happens to have a shell. A single turn can inspect the code, make an edit, run the command that tests the edit, feed that evidence back to the model, and continue until there is nothing left to do.
+Give Cortex a repository task and it works against the repository itself. It searches for evidence before loading files, reads the part it needs, makes a targeted edit, runs the command that can prove or disprove the change, and feeds that result back into the same turn.
 
 ```sh
 go install github.com/atakang7/cortex/cmd/cortex@latest
@@ -31,135 +31,145 @@ cd your-repository
 cortex
 ```
 
-**Setup is intentionally kept out of this README.** The [Lightning Quickstart](https://atakang7.github.io/cortex/) gets from zero to a running model in a few commands.
+Setup lives in the **[Lightning Quickstart](https://atakang7.github.io/cortex/)**, not in this README.
 
 ---
 
-## What Cortex actually gets right
+## Why the loop matters
 
 <p align="center">
-  <img src="assets/cortex-proof.svg" alt="Concrete Cortex behaviors: multi-tool turns, reversible writes, managed background processes, and terminal-native output" width="100%" />
+  <img src="assets/cortex-proof.svg" alt="Concrete Cortex runtime behavior: continuing after tool results, reversible writes, managed background processes, and terminal-native output" width="100%" />
 </p>
 
-### A tool call is not the end of the turn
+### It spends context on evidence, not on dumping the repository
 
-The model does not issue one shell command and disappear. Axon returns each tool result to the model and keeps the same turn alive:
+Cortex has a repository search tool backed by ripgrep and slice-based file reads. The normal path is:
 
 ```text
-request
-  ↓
-model → search → result
+find the symbol → read the relevant file/range → change it
+```
+
+not:
+
+```text
+load half the repository → hope the model notices the right thing
+```
+
+Full reads are available when they are actually useful, but they are capped. Large files can be paged instead of silently consuming the turn.
+
+### Verification is part of the same turn
+
+A tool call is not where Cortex stops. Axon sends the result back to the model and continues the same turn.
+
+```text
+model → search → evidence
   ↑                 ↓
   └──── model ←─────┘
           ↓
-        read → result
+        read
           ↓
-        write → result
+        edit
           ↓
-        test → result
+        test
           ↓
-      final answer
+   pass? finish
+   fail? continue
 ```
 
-That distinction matters. “Fix the test” can naturally mean several searches, reads, edits, and test runs without inventing a new conversation turn for each step.
+This is the important behavior behind “agentic”: **the test result can change what the model does next.** A failed build is not a footnote in the final answer; it is new input to the loop.
 
-### `/undo` is not another prompt
+### Edits are narrow and mechanically reversible
 
-Every Axon-managed write records the bytes it replaced. Writes are atomic, and `/undo` restores the previous bytes directly.
+The write tool supports exact-string replacement, line-range replacement, insertion, and full save. Exact replacement refuses ambiguous matches instead of guessing which occurrence the model meant.
+
+Every managed write records the previous bytes and uses an atomic temp-file + rename path.
 
 ```text
-write greeter.go
-      ↓
-record previous bytes
-      ↓
-atomic tmp + rename
-      ↓
-/undo → restore previous bytes
+write → record previous bytes → atomic replace
+                         │
+                         └── /undo → restore previous bytes
 ```
 
-No model call is needed to remember what it changed.
+`/undo` is not another LLM request. Cortex does not need the model to remember what it changed.
 
-### A dev server is runtime state, not a stuck command
+### Servers and watchers do not hijack the turn
 
-Anything that may wait can run in the background. Cortex gets a `shell_id`, reads only output produced since the previous poll, and terminates the whole process group when it is done.
+Commands that may wait can be started as managed background processes.
 
 ```text
-exec(background=true) → bash_1
-                         ↓
-                  edit while alive
-                         ↓
-                  bash_output(bash_1)
-                         ↓
-                  kill_shell(bash_1)
+exec(background=true) → shell_id
+                         │
+                         ├── keep editing
+                         ├── bash_output → only new log bytes
+                         └── kill_shell  → stop the process group
 ```
 
-This is the difference between “the agent can run shell commands” and an agent that can actually work around servers, watchers, clients, and other long-lived processes.
+That makes the difference on normal engineering tasks: start a dev server, inspect its output, edit while it stays alive, check only the new logs, then clean it up.
 
-### The transcript belongs to your terminal
+### The terminal remains a terminal
 
-Cortex does not keep the completed conversation inside a giant alternate-screen application. Finished blocks are committed to normal terminal scrollback. They remain searchable, selectable, copyable, and visible after Cortex exits.
+Cortex redraws only what is still live: the current tool, streamed text, composer, and status line.
 
-Only the part that is still changing is redrawn: active tool cards, streaming text, reasoning, the input box, and the status line.
+Completed work is committed to ordinary terminal scrollback. Your terminal still owns scrolling, search, selection, copy, and history after Cortex exits.
 
-### `--prompt` is not a second, weaker agent
+There is no giant alternate-screen transcript pretending to be a terminal inside your terminal.
 
-Interactive mode and one-shot mode construct the same Axon agent. The only difference is presentation.
+### Interactive and automation mode are the same agent
 
 ```sh
-cortex --prompt "explain the public API changes since HEAD~5"
+cortex
 ```
+
+and
+
+```sh
+cortex --prompt "find the regression introduced in the last five commits"
+```
+
+construct the same Axon agent. One-shot mode changes the renderer, not the execution machinery.
 
 ```text
-stdout  → final assistant answer
-stderr  → tool activity, notices, errors, trace path
+stdout  final answer
+stderr  tools · notices · errors · trace path
 ```
 
-So Cortex can be used in a terminal, a shell script, CI, or a benchmark harness without maintaining another execution path.
+So the same agent can be used by a human, a shell script, CI, or a benchmark harness without maintaining a weaker automation path.
 
 ---
 
-## The default loop is deliberately boring
+## Cortex's default behavior is intentionally opinionated
 
-Cortex's built-in coding prompt is opinionated in exactly the places that usually waste agent turns:
+The shipped coding role is short on ceremony and strict about the loop:
 
-```text
-search before guessing
-        ↓
-read before writing
-        ↓
-make the smallest change that solves the request
-        ↓
-run the command that proves the change
-        ↓
-if it failed, use the evidence and continue
-        ↓
-stop when the requested result is true
-```
+| Rule | Why it matters |
+| --- | --- |
+| **Search before guessing** | Find the implementation instead of inventing paths. |
+| **Read before writing** | Edit code the model has actually inspected. |
+| **Make the smallest useful change** | Do not turn a bug fix into an unsolicited refactor. |
+| **Run the command that can falsify the change** | Confidence is not verification. |
+| **Use failures as evidence** | A red test should drive the next action, not be hidden in prose. |
+| **Stop when the requested state is true** | Do not burn turns polishing unrelated code. |
 
-It explicitly tells the model not to spend a turn announcing work, not to rewrite a file to change three lines, not to refactor adjacent code, and not to call something finished when verification failed.
-
-That behavior lives in [`internal/config/prompt.go`](internal/config/prompt.go). You can replace the prompt completely when you want a reviewer, migration agent, or another repository-specialized role.
+That policy is the real default prompt in [`internal/config/prompt.go`](internal/config/prompt.go). Replace it and Cortex can become a reviewer, migration agent, repository archaeologist, or another code-specialized role while keeping the same runtime underneath.
 
 ---
 
-## Small product, serious runtime
+## Small surface, full runtime underneath
 
-Cortex stays small because it does not reimplement the agent machinery inside the terminal UI.
+Cortex owns the coding product:
 
 ```text
-CORTEX
-coding prompt · model/pruner choice · Bubble Tea UI · slash commands · config
-                                  │
-                                  │ axon.New(...)
-                                  ▼
-AXON
-turn loop · tools · sessions · context · streaming · retries · background shells · MCP
-                                  │
-                                  ▼
-repository · shell · model providers · MCP servers
+prompt · model/pruner choice · terminal UI · slash commands · project config
 ```
 
-The seam in Cortex is literally one constructor:
+[Axon](https://github.com/atakang7/axon) owns the reusable agent machinery:
+
+```text
+turn continuation · tools · sessions · context projection · streaming · retries
+background processes · MCP · events · usage
+```
+
+The boundary is deliberately small:
 
 ```go
 return axon.New(axon.Config{
@@ -172,25 +182,25 @@ return axon.New(axon.Config{
 })
 ```
 
-That separation is useful in practice: Cortex can stay focused on coding behavior and terminal UX while Axon owns the ugly reusable parts — tool continuation, session state, context projection, SSE streaming, retries, process lifecycle, and event delivery.
+That is why Cortex can stay focused on coding behavior instead of growing its own second runtime inside the TUI.
 
 ---
 
-## The controls that matter
+## Useful controls, nothing more
 
 ```text
-/model          switch the active model without restarting the session
+/model          switch the active model without throwing away the session
 /pruner         switch or disable the secondary context model
-/undo           restore the last Axon-managed file edit byte-for-byte
-/session        show turn, message, edit, and session-file state
+/undo           restore the last managed edit byte-for-byte
+/session        show turn, message, edit, and session state
 /cd <path>      move the agent to another working directory
 /new            clear the session
 /help           show the rest
 ```
 
-The status line keeps the important state visible: active model, pruner, working directory, turn, elapsed time while busy, and the key that matters next.
+The status line keeps the state that matters visible: model, pruner, working directory, turn, elapsed time while busy, and the next useful key.
 
-For long sessions, the optional pruner changes only the context **projection** sent to the main model. The durable session history is not rewritten or deleted.
+Every run also writes a JSONL trace, so when a turn behaves strangely you can inspect the event sequence instead of reverse-engineering it from the final prose.
 
 ---
 
@@ -200,18 +210,12 @@ For long sessions, the optional pruner changes only the context **projection** s
 go install github.com/atakang7/cortex/cmd/cortex@latest
 ```
 
-Prebuilt Linux and macOS binaries for amd64/arm64 are published on [GitHub Releases](https://github.com/atakang7/cortex/releases/latest).
+Prebuilt Linux and macOS binaries for amd64/arm64 are available in [GitHub Releases](https://github.com/atakang7/cortex/releases/latest).
 
-Then use the **[Lightning Quickstart](https://atakang7.github.io/cortex/)**. It covers the only setup you need immediately: provider, model, optional pruner, and `cortex`.
+Then use the **[Lightning Quickstart](https://atakang7.github.io/cortex/)** for provider + model setup and run:
 
 ```sh
 cortex
-```
-
-Or make the same agent one-shot:
-
-```sh
-cortex --prompt "find the regression introduced in the last five commits"
 ```
 
 ---

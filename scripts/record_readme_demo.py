@@ -4,6 +4,10 @@
 The model is scripted, but Cortex is not mocked: the binary runs through its real
 Bubble Tea UI and Axon executes real search/read/write/exec tools against a
 disposable Go repository. The PTY is captured and rendered into the README GIF.
+
+The renderer deliberately looks like a normal terminal, not a product mockup.
+That is Cortex's UI: shell scrollback above a tiny live area, with no fake window
+chrome or alternate-screen frame invented for the README.
 """
 
 from __future__ import annotations
@@ -23,17 +27,16 @@ import pexpect
 import pyte
 from PIL import Image, ImageDraw, ImageFont
 
-COLS = 112
-ROWS = 31
+COLS = 118
+ROWS = 30
 POLL = 0.075
 
-BG = "#0b0d12"
-CHROME = "#17191f"
-BORDER = "#2b2f39"
+# Close to the dark GNOME-terminal palette in the real Cortex screenshot.
+BG = "#1d1b1b"
 DEFAULT_FG = "#d8dce8"
 
 ANSI = {
-    "black": "#111318",
+    "black": "#1d1b1b",
     "red": "#fca5a5",
     "green": "#86efac",
     "brown": "#fdba74",
@@ -127,14 +130,14 @@ class DemoHandler(http.server.BaseHTTPRequestHandler):
         self.send_header("Connection", "close")
         self.end_headers()
 
-        # Make the real Cortex spinner/tool lifecycle visible rather than
-        # returning the entire scripted model response in one scheduler tick.
-        time.sleep(0.38)
+        # Slow the scripted provider just enough for Cortex's actual spinner,
+        # tool-card and stream states to be visible in the recording.
+        time.sleep(0.34)
         for item in SCRIPT[index]:
             payload = f"data: {json.dumps(item)}\n\n".encode()
             self.wfile.write(payload)
             self.wfile.flush()
-            time.sleep(0.16 if "tool_calls" in item["choices"][0]["delta"] else 0.12)
+            time.sleep(0.15 if "tool_calls" in item["choices"][0]["delta"] else 0.11)
         self.wfile.write(b"data: [DONE]\n\n")
         self.wfile.flush()
         self.close_connection = True
@@ -144,18 +147,22 @@ class Server(http.server.ThreadingHTTPServer):
     daemon_threads = True
 
 
-def setup_demo(root: Path, port: int) -> tuple[Path, dict[str, str]]:
+def setup_demo(root: Path, port: int, binary: str) -> tuple[Path, dict[str, str]]:
     home = root / "home"
-    repo = root / "repo"
+    repo = root / "cortex-demo"
+    bin_dir = root / "bin"
     (home / ".config" / "axon").mkdir(parents=True)
     (home / ".config" / "cortex").mkdir(parents=True)
     repo.mkdir(parents=True)
+    bin_dir.mkdir(parents=True)
 
+    # Keep the labels users see in the recording realistic while routing both
+    # model names to the deterministic local server.
     (home / ".config" / "axon" / "axon.yaml").write_text(
-        f"""providers:\n  demo:\n    base_url: http://127.0.0.1:{port}\n    models:\n      cortex-demo:\nmodel:\n  exclude_reasoning: true\n  request_timeout: 30s\n  idle_timeout: 5s\n"""
+        f"""providers:\n  demo:\n    base_url: http://127.0.0.1:{port}\n    models:\n      z-ai/glm-5.2:\n      deepseek/deepseek-v4-flash-0731:\nmodel:\n  exclude_reasoning: true\n  request_timeout: 30s\n  idle_timeout: 5s\n"""
     )
     (home / ".config" / "cortex" / "config.yaml").write_text(
-        "provider: demo\nmodel: cortex-demo\n"
+        "provider: demo\nmodel: z-ai/glm-5.2\npruner:\n  provider: demo\n  model: deepseek/deepseek-v4-flash-0731\n"
     )
 
     (repo / "go.mod").write_text("module example.com/cortex-demo\n\ngo 1.26.2\n")
@@ -166,6 +173,14 @@ def setup_demo(root: Path, port: int) -> tuple[Path, dict[str, str]]:
         'package demo\n\nimport "testing"\n\nfunc TestGreeting(t *testing.T) {\n\tif got := Greeting(); got != "hello, cortex" {\n\t\tt.Fatalf("Greeting() = %q, want %q", got, "hello, cortex")\n\t}\n}\n'
     )
 
+    # Launch Cortex through a real interactive shell so the GIF begins the way
+    # the product actually begins: shell prompt → `cortex` → trace → TUI.
+    target = bin_dir / "cortex"
+    try:
+        target.symlink_to(Path(binary).resolve())
+    except FileExistsError:
+        pass
+
     env = os.environ.copy()
     env.update(
         {
@@ -173,9 +188,12 @@ def setup_demo(root: Path, port: int) -> tuple[Path, dict[str, str]]:
             "XDG_CONFIG_HOME": str(home / ".config"),
             "XDG_CACHE_HOME": str(home / ".cache"),
             "XDG_DATA_HOME": str(home / ".local" / "share"),
+            "PATH": str(bin_dir) + os.pathsep + env.get("PATH", ""),
             "TERM": "xterm-256color",
             "COLORTERM": "truecolor",
             "NO_COLOR": "",
+            # A small two-line shell prompt in the spirit of the real capture.
+            "PS1": "\001\033[1;36m\002cortex-demo\001\033[0m\002 on \001\033[1;35m\002main\001\033[0m\002 via \001\033[1;36m\002go1.26.2\001\033[0m\002\n\001\033[1;32m\002❯\001\033[0m\002 ",
         }
     )
     return repo, env
@@ -209,25 +227,19 @@ def fonts(size: int) -> tuple[ImageFont.FreeTypeFont, ImageFont.FreeTypeFont]:
 
 
 def render(screen: pyte.Screen) -> Image.Image:
-    font, font_bold = fonts(18)
+    # Match an ordinary terminal viewport. No fake OS chrome, title bar,
+    # rounded product frame or decorative labels.
+    font, font_bold = fonts(15)
     bbox = font.getbbox("M")
     cell_w = bbox[2] - bbox[0]
-    cell_h = 23
-    pad_x, pad_y = 24, 18
-    title_h = 42
+    cell_h = 18
+    pad_x, pad_y = 8, 8
     width = COLS * cell_w + pad_x * 2
-    height = ROWS * cell_h + pad_y * 2 + title_h
+    height = ROWS * cell_h + pad_y * 2
 
     image = Image.new("RGB", (width, height), BG)
     d = ImageDraw.Draw(image)
-    d.rounded_rectangle((1, 1, width - 2, height - 2), radius=16, fill=BG, outline=BORDER, width=2)
-    d.rounded_rectangle((2, 2, width - 3, title_h), radius=14, fill=CHROME)
-    d.rectangle((2, title_h - 14, width - 3, title_h), fill=CHROME)
-    for x, fill in ((22, "#ef6b63"), (43, "#e7bd52"), (64, "#62c554")):
-        d.ellipse((x - 5, 16, x + 5, 26), fill=fill)
-    d.text((width // 2, 12), "cortex · real run", fill="#9ca3af", font=font, anchor="ma")
 
-    origin_y = title_h + pad_y
     for y in range(ROWS):
         row = screen.buffer[y]
         for x in range(COLS):
@@ -237,21 +249,19 @@ def render(screen: pyte.Screen) -> Image.Image:
                 continue
             fg = color(cell.fg)
             used_font = font_bold if cell.bold else font
-            d.text((pad_x + x * cell_w, origin_y + y * cell_h), ch, fill=fg, font=used_font)
+            d.text((pad_x + x * cell_w, pad_y + y * cell_h), ch, fill=fg, font=used_font)
 
-    # Cortex's cursor is part of the product feel; pyte tracks where Bubble Tea
-    # left it, so render a quiet underline rather than inventing a fake caret.
+    # The cursor is part of Cortex's actual composer. Render a thin underline
+    # where the PTY says it is rather than inventing a marketing caret.
     if 0 <= screen.cursor.y < ROWS and 0 <= screen.cursor.x < COLS:
         x = pad_x + screen.cursor.x * cell_w
-        y = origin_y + screen.cursor.y * cell_h + cell_h - 3
+        y = pad_y + screen.cursor.y * cell_h + cell_h - 2
         d.rectangle((x, y, x + cell_w - 1, y + 1), fill="#fdba74")
 
     return image
 
 
 def fingerprint(screen: pyte.Screen) -> tuple[Any, ...]:
-    # Include attributes as well as glyphs so transitions such as the busy input
-    # border are not dropped simply because the characters stayed the same.
     rows = []
     for y in range(ROWS):
         row = screen.buffer[y]
@@ -265,7 +275,8 @@ def record(binary: str, repo: Path, env: dict[str, str], output: Path) -> None:
     screen = pyte.Screen(COLS, ROWS)
     stream = pyte.ByteStream(screen)
     child = pexpect.spawn(
-        binary,
+        "/bin/bash",
+        ["--noprofile", "--norc", "-i"],
         cwd=str(repo),
         env=env,
         dimensions=(ROWS, COLS),
@@ -300,18 +311,26 @@ def record(binary: str, repo: Path, env: dict[str, str], output: Path) -> None:
                 break
             snap()
 
-    pump(1.0)
+    # Show the real shell launch instead of starting the binary off-screen.
+    pump(0.8)
+    for ch in "cortex":
+        child.send(ch.encode())
+        pump(0.07)
+    pump(0.25)
+    child.send(b"\r")
+    pump(1.35)
+
     prompt = "fix the failing greeting test; keep the change minimal and verify it"
     for ch in prompt:
         child.send(ch.encode())
-        pump(0.026)
+        pump(0.025)
     pump(0.35)
     child.send(b"\r")
 
-    # The scripted model performs four real tool calls and then streams a final
-    # answer. Give the real TUI enough room to animate each state and return idle.
-    pump(9.5)
-    pump(1.4)
+    # Four real tool calls, then the streamed answer, then a brief idle hold so
+    # the final Cortex status line is readable before the GIF loops.
+    pump(9.0)
+    pump(1.6)
 
     child.close(force=True)
     if not frames:
@@ -343,7 +362,7 @@ def main() -> None:
 
     try:
         with tempfile.TemporaryDirectory(prefix="cortex-readme-") as tmp:
-            repo, env = setup_demo(Path(tmp), port)
+            repo, env = setup_demo(Path(tmp), port, args.cortex)
             record(args.cortex, repo, env, args.output)
     finally:
         server.shutdown()

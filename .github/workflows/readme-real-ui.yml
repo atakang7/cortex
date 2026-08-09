@@ -1,0 +1,50 @@
+name: README real UI demo
+
+on:
+  push:
+    branches: [docs/readme-real-ui]
+    paths:
+      - scripts/record_readme_demo.py
+      - .github/workflows/readme-real-ui.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: docs/readme-real-ui
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install recorder dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ripgrep fonts-dejavu-core
+          python -m pip install --disable-pip-version-check pillow pexpect pyte
+
+      - name: Build Cortex
+        run: go build -o /tmp/cortex ./cmd/cortex
+
+      - name: Record real terminal UI
+        run: python scripts/record_readme_demo.py --cortex /tmp/cortex --output assets/cortex-live.gif
+
+      - name: Commit generated GIF
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/cortex-live.gif
+          if git diff --cached --quiet; then
+            echo "demo unchanged"
+            exit 0
+          fi
+          git commit -m "docs: refresh real Cortex terminal demo"
+          git pull --rebase origin docs/readme-real-ui
+          git push origin HEAD:docs/readme-real-ui
