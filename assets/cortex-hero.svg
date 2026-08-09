@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" role="img" aria-labelledby="title desc">
+  <title id="title">Cortex terminal coding session</title>
+  <desc id="desc">A faithful visual recreation of Cortex showing tool calls, verification output, the input box, model, pruner, working directory, and turn status.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#111318"/>
+      <stop offset="1" stop-color="#090b10"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="22" stdDeviation="26" flood-opacity=".38"/></filter>
+    <style>
+      .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace}
+      .text{fill:#A5B4FC;font-size:22px}.muted{fill:#6B7280}.faint{fill:#4B5563}.brand{fill:#FDBA74}.tool{fill:#7DD3FC}.ok{fill:#86EFAC}.user{fill:#67E8F9}.pruner{fill:#D8B4FE}.white{fill:#EEF2FF}.small{font-size:17px}.tiny{font-size:15px}.bold{font-weight:700}
+    </style>
+  </defs>
+  <rect width="1440" height="900" fill="url(#bg)" rx="32"/>
+  <g filter="url(#shadow)">
+    <rect x="70" y="50" width="1300" height="800" rx="24" fill="#17191f" stroke="#2b2f39"/>
+    <rect x="70" y="50" width="1300" height="52" rx="24" fill="#20232a"/>
+    <rect x="70" y="82" width="1300" height="20" fill="#20232a"/>
+  </g>
+  <circle cx="104" cy="76" r="7" fill="#5b606d"/><circle cx="128" cy="76" r="7" fill="#5b606d"/><circle cx="152" cy="76" r="7" fill="#5b606d"/>
+  <text x="720" y="83" text-anchor="middle" class="mono white small bold">cortex</text>
+  <text x="1330" y="83" text-anchor="end" class="mono muted tiny">terminal coding agent</text>
+
+  <text x="106" y="143" class="mono brand bold" font-size="25">cortex</text>
+  <text x="208" y="143" class="mono muted small">z-ai/glm-5.2</text>
+  <text x="106" y="171" class="mono faint tiny">github.com/atakang7/cortex</text>
+
+  <text x="106" y="224" class="mono user bold" font-size="21">❯ add first-turn LLM generated session titles, keep the runtime clean</text>
+
+  <text x="112" y="276" class="mono tool bold" font-size="20">▐ search</text>
+  <text x="228" y="276" class="mono muted small">deriveTitle</text>
+  <text x="112" y="307" class="mono faint small">│ agent.go: deriveTitle(input string) string</text>
+  <text x="112" y="338" class="mono ok small">└ ✓ 8 lines</text>
+
+  <text x="112" y="390" class="mono tool bold" font-size="20">▐ read</text>
+  <text x="204" y="390" class="mono muted small">loop.go</text>
+  <text x="112" y="421" class="mono faint small">│ turn 1 title path + session persistence</text>
+  <text x="112" y="452" class="mono ok small">└ ✓ 74 lines</text>
+
+  <text x="112" y="504" class="mono tool bold" font-size="20">▐ write</text>
+  <text x="216" y="504" class="mono muted small">loop.go · replace_string</text>
+  <text x="112" y="535" class="mono ok small">└ ✓ ok</text>
+
+  <text x="112" y="587" class="mono tool bold" font-size="20">▐ exec</text>
+  <text x="204" y="587" class="mono muted small">go test ./...</text>
+  <text x="112" y="618" class="mono faint small">│ ok   github.com/atakang7/cortex/internal/ui     0.018s</text>
+  <text x="112" y="649" class="mono faint small">│ ok   github.com/atakang7/cortex/internal/config (cached)</text>
+  <text x="112" y="680" class="mono ok small">└ ✓ tests green</text>
+
+  <text x="106" y="728" class="mono text bold">Both repos build, vet, and test green. Done.</text>
+
+  <rect x="94" y="754" width="1252" height="50" rx="10" fill="#14161b" stroke="#4B5563"/>
+  <text x="112" y="786" class="mono brand bold" font-size="22">❯</text>
+  <text x="143" y="786" class="mono faint small">ask for a change, or /help</text>
+  <rect x="143" y="793" width="12" height="2" fill="#FDBA74"/>
+
+  <text x="106" y="832" class="mono faint tiny">z-ai/glm-5.2</text>
+  <text x="267" y="832" class="mono pruner tiny">· pruner: deepseek/deepseek-v4-flash-0731</text>
+  <text x="650" y="832" class="mono faint tiny">· zperson/cortex</text>
+  <text x="824" y="832" class="mono faint tiny">· turn 2</text>
+  <text x="930" y="832" class="mono faint tiny">· ctx 13868</text>
+  <text x="1328" y="832" text-anchor="end" class="mono faint tiny">ctrl+j newline · /help commands</text>
+</svg>
