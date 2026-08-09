@@ -227,3 +227,57 @@ func TestDefaultNameIsCortex(t *testing.T) {
 		t.Errorf("name = %q, want cortex as the default", cfg.Name)
 	}
 }
+func TestSaveModelPersistsAcrossRestarts(t *testing.T) {
+	userDir, workDir := workspace(t)
+
+	// Start from a user config that names a different model.
+	write(t, filepath.Join(userDir, "cortex", "config.yaml"), "provider: openai\nmodel: gpt-4o\n")
+	// A project config should not be clobbered by saving the model.
+	write(t, filepath.Join(workDir, "cortex.yaml"), "name: project\n")
+
+	if err := SaveModel("openai", "gpt-4o-mini"); err != nil {
+		t.Fatal(err)
+	}
+
+	// A reload must see the saved model from the user config, and the
+	// project's name must survive — the save must only touch the model
+	// fields, not replace the whole file or affect the layered load.
+	cfg, err := Load("")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if cfg.ModelName != "gpt-4o-mini" {
+		t.Errorf("model = %q, want gpt-4o-mini persisted from SaveModel", cfg.ModelName)
+	}
+	if cfg.Provider != "openai" {
+		t.Errorf("provider = %q, want openai", cfg.Provider)
+	}
+	if cfg.Name != "project" {
+		t.Errorf("name = %q, want project from the project config — SaveModel must not clobber it", cfg.Name)
+	}
+}
+
+func TestSaveModelCreatesAFileWhenNoneExists(t *testing.T) {
+	userDir, _ := workspace(t)
+
+	// No user config exists yet; a session may have started from an env
+	// override. SaveModel must create the file so the choice sticks.
+	if err := SaveModel("ollama", "llama3"); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load("")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if cfg.Provider != "ollama" || cfg.ModelName != "llama3" {
+		t.Errorf("got %s/%s, want ollama/llama3", cfg.Provider, cfg.ModelName)
+	}
+
+	// The file must exist on disk, not just in memory.
+	if _, err := os.Stat(filepath.Join(userDir, "cortex", "config.yaml")); err != nil {
+		t.Errorf("user config not written: %v", err)
+	}
+}

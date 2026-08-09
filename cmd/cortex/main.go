@@ -165,6 +165,16 @@ func runInteractive(cfg config.Config, settings axon.Settings, model axon.Model,
 		PrunerName: cfg.Pruner.Model,
 		AgentName:  cfg.Name,
 		Settings:   settings,
+		OnPrunerChanged: func(provider, model string) {
+			if err := config.SavePruner(provider, model); err != nil {
+				fmt.Fprintf(os.Stderr, "cortex: could not save pruner: %v\n", err)
+			}
+		},
+		OnModelChanged: func(provider, model string) {
+			if err := config.SaveModel(provider, model); err != nil {
+				fmt.Fprintf(os.Stderr, "cortex: could not save model: %v\n", err)
+			}
+		},
 	})
 }
 
