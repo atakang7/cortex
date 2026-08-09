@@ -1,0 +1,50 @@
+---
+import Doc from '../../../layouts/Doc.astro';
+import Pager from '../../../components/Pager.astro';
+const slug = 'guides/keyboard';
+---
+<Doc slug={slug} title="Keyboard reference">
+  <h1>Keyboard reference</h1>
+  <p class="lede">Every key the terminal binds, in one table.</p>
+
+  <table>
+    <thead><tr><th>Key</th><th>Action</th></tr></thead>
+    <tbody>
+      <tr><td><code>enter</code></td><td>Send the current input.</td></tr>
+      <tr><td><code>ctrl+j</code> / <code>alt+enter</code></td><td>Insert a newline.</td></tr>
+      <tr><td><code>ctrl+c</code> / <code>esc</code></td><td>Interrupt the running turn.</td></tr>
+      <tr><td><code>ctrl+c</code> (when idle)</td><td>Clear the input, then exit.</td></tr>
+      <tr><td><code>ctrl+d</code></td><td>Exit.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Ctrl-C has two behaviours</h2>
+  <p>
+    Ctrl-C is context-sensitive. While a turn is running, it cancels the turn — the agent stops
+    and you return to the prompt. When idle (no turn in flight), the first Ctrl-C clears the
+    input buffer; a second exits.
+  </p>
+
+  <h2>Esc interrupts too</h2>
+  <p>
+    <code>Esc</code> is bound to the same interrupt as Ctrl-C, so you can cancel a turn even on
+    a terminal where Ctrl-C is captured by the shell or a multiplexer.
+  </p>
+
+  <h2>Newlines without sending</h2>
+  <p>
+    <code>Ctrl+J</code> and <code>Alt+Enter</code> both insert a literal newline, so you can
+    write multi-line prompts without accidentally sending them.
+  </p>
+
+  <div class="callout info">
+    <span class="ico">ℹ️</span>
+    <div class="callout-body">
+      <strong>Raw mode.</strong> cortex runs the terminal in raw mode, so keystrokes are
+      intercepted individually rather than line-buffered. That's why Ctrl-C is a key, not a
+      signal — see <a href="/docs/guides/interactive/">Interactive mode</a>.
+    </div>
+  </div>
+
+  <div class="docs-pager"><Pager slug={slug} /></div>
+</Doc>

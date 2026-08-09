@@ -1,0 +1,51 @@
+---
+import Doc from '../../../layouts/Doc.astro';
+import Pager from '../../../components/Pager.astro';
+const slug = 'guides/commands';
+---
+<Doc slug={slug} title="Slash commands">
+  <h1>Slash commands</h1>
+  <p class="lede">Type a slash command at the prompt to control the session.</p>
+
+  <table>
+    <thead><tr><th>Command</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><code>/new</code></td><td>Wipe the session and start over.</td></tr>
+      <tr><td><code>/undo</code></td><td>Revert the last file edit, byte for byte.</td></tr>
+      <tr><td><code>/cd &lt;path&gt;</code></td><td>Change the working directory.</td></tr>
+      <tr><td><code>/pwd</code></td><td>Show the working directory.</td></tr>
+      <tr><td><code>/session</code></td><td>Session file, turn count, pending undos.</td></tr>
+      <tr><td><code>/help</code></td><td>List the commands.</td></tr>
+      <tr><td><code>/quit</code></td><td>Exit (<code>/exit</code>, <code>/q</code> also work).</td></tr>
+    </tbody>
+  </table>
+
+  <h2><code>/undo</code> — byte-for-byte revert</h2>
+  <p>
+    Every file edit is atomic and recorded. <code>/undo</code> reverts the last edit exactly —
+    the previous content is restored, not reconstructed. Repeat <code>/undo</code> to step
+    backwards through the session's edits.
+  </p>
+
+  <h2><code>/session</code> — inspect state</h2>
+  <p>
+    Shows the path to the append-only session file, the current turn count, and how many undos
+    are pending. Useful when you want to find the session on disk or understand how far the
+    conversation has gone.
+  </p>
+
+  <h2><code>/new</code> — clean slate</h2>
+  <p>
+    Wipes the in-memory session and starts a fresh turn counter. The old session file remains on
+    disk — <code>/new</code> only affects the live conversation, not persisted history.
+  </p>
+
+  <div class="callout tip">
+    <span class="ico">💡</span>
+    <div class="callout-body">
+      <strong>Aliases:</strong> <code>/quit</code>, <code>/exit</code> and <code>/q</code> all exit.
+    </div>
+  </div>
+
+  <div class="docs-pager"><Pager slug={slug} /></div>
+</Doc>

@@ -1,0 +1,71 @@
+---
+import Doc from '../../../layouts/Doc.astro';
+import Pager from '../../../components/Pager.astro';
+const slug = 'playground/overview';
+---
+<Doc slug={slug} title="Playground overview">
+  <h1>Playground</h1>
+  <p class="lede">A harness for watching cortex work and finding out <em>why</em> it works the way it does.</p>
+
+  <blockquote>
+    Not a benchmark — <code>benchmarks/polyglot</code> scores cortex. This one shows its reasoning
+    so a bad habit can be traced to the prompt or tool description that caused it.
+  </blockquote>
+
+  <h2>The commands</h2>
+  <pre><code>./run.sh &lt;task&gt; [label]             # run cortex on one task, keep everything
+./batch.sh [-n runs] [task ...]      # repeat a suite and keep going on failure
+./report.sh [runs/&lt;task-label&gt; ...]  # summarize pass/fail, cost and behavior
+./trace.sh &lt;view&gt; &lt;trace&gt;            # read what happened inside one run</code></pre>
+
+  <h2>What a run keeps</h2>
+  <p>
+    Each run gets its own directory under <code>runs/</code> holding a pristine copy of the task's
+    seed project, the trace cortex wrote, cortex's own stdout, and verifier output. The seed is
+    never touched, so a run is repeatable and two runs are directly comparable:
+  </p>
+  <ul>
+    <li><code>trace.jsonl</code> — the wire-level record</li>
+    <li><code>diff.patch</code> — exactly what the agent changed</li>
+    <li><code>stdout.txt</code> / <code>stderr.txt</code> — the agent's own output</li>
+    <li><code>verify_stdout.txt</code> / <code>verify_stderr.txt</code> — final project verification</li>
+    <li><code>status.txt</code> — git status of the work tree</li>
+  </ul>
+
+  <h2>The trace</h2>
+  <p>
+    Newline-delimited JSON with one discriminator, <code>kind</code>. Most kinds are axon event
+    names. Three are cortex's own:
+  </p>
+  <table>
+    <thead><tr><th>kind</th><th>what it holds</th></tr></thead>
+    <tbody>
+      <tr><td><code>run</code></td><td>which build and which models produced this trace</td></tr>
+      <tr><td><code>wire_request</code></td><td>the exact messages sent to a model, and to which one</td></tr>
+      <tr><td><code>wire_reply</code></td><td>what came back, and how long it took</td></tr>
+    </tbody>
+  </table>
+  <p>
+    The wire kinds are the reason this harness exists. Events are emitted <em>downstream</em> of a
+    request — they describe the reply and never the prompt — so the composed system message, the
+    windowed conversation and the pruner's own curator calls are all invisible without them.
+    Prompt engineering against the event stream alone is guesswork.
+  </p>
+
+  <h2>The views</h2>
+  <p><code>trace.sh</code> offers six views, each one <code>jq</code> filter over the trace:</p>
+  <pre><code>./trace.sh timeline runs/report-final/trace.jsonl
+./trace.sh system   runs/report-final/trace.jsonl   # the prompt under test
+./trace.sh prompt   runs/report-final/trace.jsonl pruner
+./trace.sh tools    runs/report-final/trace.jsonl   # shows a wrong approach fastest</code></pre>
+
+  <p>
+    <code>report.sh</code> is the first thing to read after a suite. It flags failed verification,
+    tool errors, runtime errors, no-op prunes, large call counts, and no-diff runs before you dive
+    into individual traces.
+  </p>
+
+  <p>Continue to <a href="/docs/playground/running-tasks/">Running tasks</a> and <a href="/docs/playground/reading-traces/">Reading traces</a> for the details.</p>
+
+  <div class="docs-pager"><Pager slug={slug} /></div>
+</Doc>

@@ -1,0 +1,64 @@
+---
+import Doc from '../../../layouts/Doc.astro';
+import Pager from '../../../components/Pager.astro';
+const slug = 'reference/api-keys';
+---
+<Doc slug={slug} title="API keys">
+  <h1>API keys</h1>
+  <p class="lede">Where the key comes from. Checked in order; the first one that answers wins.</p>
+
+  <ol class="resolution">
+    <li>
+      <code>api_key</code> in axon's <code>providers.json</code> — a leading <code>$</code> reads
+      that environment variable at startup, so you never commit the key itself.
+    </li>
+    <li>
+      The <code>LLM_API_KEY</code> environment variable.
+    </li>
+    <li>
+      <code>~/.config/agent/providers.json</code>, matched on the <code>provider</code> name — the
+      shared file the axon-family tools already use. Override its path with
+      <code>AXON_PROVIDERS_PATH</code>.
+    </li>
+  </ol>
+
+  <p>
+    The third exists so a key has <strong>one home on disk</strong>. If you already keep credentials
+    in <code>providers.json</code>, omit the key from your cortex config entirely and cortex will
+    find it:
+  </p>
+  <pre><code>&#123; "providers": [
+    &#123; "name": "openrouter", "base_url": "https://openrouter.ai/api", "api_key": "sk-or-..." &#125;
+] &#125;</code></pre>
+  <p>
+    cortex reads only <code>name</code> and <code>api_key</code> from that file; the model lists and
+    routing options in it belong to other tools and are ignored.
+  </p>
+
+  <h2>Local endpoints need no key</h2>
+  <p>
+    A <code>localhost</code> endpoint (e.g. ollama running locally) needs no API key. Point
+    <code>LLM_BASE_URL</code> at it and leave the key unset.
+  </p>
+
+  <h2>The leading <code>$</code></h2>
+  <p>
+    Wherever a config accepts an <code>api_key</code> value, a leading <code>$</code> reads the rest
+    as an environment variable name and substitutes its value at startup. This keeps the literal key
+    out of your config file:
+  </p>
+  <pre><code>&#123; "providers": [
+    &#123; "name": "openai", "api_key": "$OPENAI_API_KEY" &#125;
+] &#125;</code></pre>
+
+  <div class="callout info">
+    <span class="ico">ℹ️</span>
+    <div class="callout-body">
+      <strong>Why three sources?</strong> The cascade lets you keep a default provider in your user
+      config, override only the model per project, and keep the actual credential in one shared
+      file. No copying keys between configs.
+    </div>
+  </div>
+
+  <div class="docs-pager"><Pager slug={slug} /></div>
+</Doc>

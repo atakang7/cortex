@@ -1,0 +1,78 @@
+---
+import Doc from '../../../layouts/Doc.astro';
+import Pager from '../../../components/Pager.astro';
+const slug = 'guides/configuration';
+---
+<Doc slug={slug} title="Configuration">
+  <h1>Configuration</h1>
+  <p class="lede">Three sources, each overriding the last. Layering is field by field.</p>
+
+  <h2>The cascade</h2>
+  <ol>
+    <li><code>~/.config/cortex/config.yaml</code> — your defaults (honours <code>XDG_CONFIG_HOME</code>)</li>
+    <li><code>./cortex.yaml</code> — this project's overrides</li>
+    <li>the environment — <code>LLM_PROVIDER</code>, <code>LLM_MODEL</code></li>
+  </ol>
+  <p>
+    Layering is <strong>field by field</strong>, so a project config that names only a model keeps
+    the provider from your user config. You only specify what you want to override.
+  </p>
+
+  <div class="callout warn">
+    <span class="ico">⚠️</span>
+    <div class="callout-body">
+      <strong>Specifying <code>--config</code></strong> disables the cascade entirely — only that
+      file is read, plus the environment. Use it when you want a specific, self-contained config.
+    </div>
+  </div>
+
+  <h2>The full file</h2>
+  <pre><code>name: reviewer                  # shown in the banner
+
+provider: openrouter            # the axon provider name
+model: deepseek/deepseek-v3.2   # the model within that provider
+
+system_prompt: ./reviewer.md    # a path is read from disk; prose is used as written
+
+pruner:                         # optional secondary model for context pruning
+  model: meta-llama/llama-3.1-8b
+  provider: openrouter          # defaults to the main provider if omitted
+
+mcp_servers:                    # spawned at startup, their tools auto-discovered
+  github:
+    command: docker
+    args: ["run", "-i", "--rm", "ghcr.io/github/github-mcp-server"]
+    env: ["GITHUB_TOKEN=..."]</code></pre>
+
+  <h2>Providers and credentials are not in this file</h2>
+  <p>
+    cortex's config only names <em>which</em> provider and model to use. Endpoints and credentials
+    live in axon's config — the shared <code>providers.json</code> the axon-family tools already
+    use, or the <code>LLM_API_KEY</code> / <code>LLM_BASE_URL</code> environment variables. See
+    <a href="/docs/reference/api-keys/">API keys</a> for the resolution order.
+  </p>
+
+  <h2>Known providers</h2>
+  <p>
+    <code>provider</code> supplies <code>base_url</code> for <code>openai</code>,
+    <code>openrouter</code>, <code>anthropic</code>, <code>groq</code>, <code>deepseek</code>
+    and <code>ollama</code>. Any other provider must state its own <code>base_url</code>
+    (via axon's config or <code>LLM_BASE_URL</code>). A <code>localhost</code> endpoint
+    (e.g. ollama) needs no API key.
+  </p>
+
+  <h2>System prompt</h2>
+  <p>
+    Omit <code>system_prompt</code> and cortex uses its built-in coding-agent role text. The
+    tool catalog is appended by axon, so a custom prompt <strong>must not enumerate tools</strong>
+    — or you pay for those tokens twice on every call. See
+    <a href="/docs/concepts/architecture/">Architecture</a> for why.
+  </p>
+
+  <h2>The fastest possible start</h2>
+  <pre><code>export LLM_MODEL=gpt-4o
+export LLM_API_KEY=sk-...
+cortex</code></pre>
+
+  <div class="docs-pager"><Pager slug={slug} /></div>
+</Doc>

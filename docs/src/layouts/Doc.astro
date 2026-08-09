@@ -1,0 +1,38 @@
+---
+import Layout from './Layout.astro';
+import { nav } from '../nav';
+import ThemeToggle from '../components/ThemeToggle.astro';
+const { slug, title } = Astro.props;
+const base = '/docs';
+---
+<Layout title={title} description="cortex documentation">
+  <div class="docs-shell">
+    <!-- Sidebar -->
+    <aside class="docs-sidebar" aria-label="Documentation navigation">
+      <div class="sb-brand">
+        <span class="glyph" aria-hidden="true">◆</span>
+        <a href="/">cortex</a>
+        <span class="sb-toggle"><ThemeToggle /></span>
+      </div>
+      <nav aria-label="Docs sections">
+      {nav.map(sec => (
+        <div class="sb-section">
+          <div class="sb-section-title" id={`sb-${sec.label.toLowerCase().replace(/\s+/g,'-')}`}>{sec.label}</div>
+          <ul aria-labelledby={`sb-${sec.label.toLowerCase().replace(/\s+/g,'-')}`}>
+            {sec.pages.map(p => (
+              <li>
+                <a href={`${base}/${p.slug}/`} class={p.slug === slug ? 'active' : ''} aria-current={p.slug === slug ? 'page' : undefined}>{p.title}</a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+      </nav>
+    </aside>
+
+    <!-- Content -->
+    <main class="docs-content" id="main-content" tabindex="-1">
+      <slot />
+    </main>
+  </div>
+</Layout>

@@ -1,0 +1,44 @@
+---
+import Doc from '../../../layouts/Doc.astro';
+import Pager from '../../../components/Pager.astro';
+const slug = 'getting-started/install';
+---
+<Doc slug={slug} title="Install">
+  <h1>Install</h1>
+  <p class="lede">Get the cortex binary on your machine in one of three ways.</p>
+
+  <h2>go install</h2>
+  <p>If you have a Go toolchain, this is the fastest path:</p>
+  <pre><code>go install github.com/atakang7/cortex/cmd/cortex@latest</code></pre>
+  <p>The binary lands in your <code>$GOPATH/bin</code> — make sure that's on your <code>$PATH</code>.</p>
+
+  <h2>Pre-built binaries</h2>
+  <p>
+    Every <a href="https://github.com/atakang7/cortex/releases">release</a> ships binaries for
+    <code>linux</code> and <code>darwin</code> on <code>amd64</code> and <code>arm64</code>.
+    Download the archive for your platform, extract it, and put the <code>cortex</code>
+    binary somewhere on your <code>$PATH</code>.
+  </p>
+  <pre><code>curl -L https://github.com/atakang7/cortex/releases/latest/download/cortex-linux-amd64.tar.gz \
+  | tar xz -C /usr/local/bin cortex</code></pre>
+
+  <h2>Build from source</h2>
+  <pre><code>git clone https://github.com/atakang7/cortex.git
+cd cortex
+go build -o cortex ./cmd/cortex</code></pre>
+
+  <h2>Verify</h2>
+  <p>Check that it runs and prints build metadata:</p>
+  <pre><code>cortex --version</code></pre>
+  <pre><code>cortex 1.2.3 (abc1234, built 2025-01-01T00:00:00Z)</code></pre>
+
+  <div class="callout info">
+    <span class="ico">ℹ️</span>
+    <div class="callout-body">
+      <strong>What's next?</strong> cortex needs a model before it can start. Continue to
+      <a href="/docs/getting-started/quick-start/">Quick start</a> to configure one.
+    </div>
+  </div>
+
+  <div class="docs-pager"><Pager slug={slug} /></div>
+</Doc>
