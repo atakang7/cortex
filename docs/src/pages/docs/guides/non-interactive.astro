@@ -1,0 +1,48 @@
+---
+import Doc from '../../../layouts/Doc.astro';
+import Pager from '../../../components/Pager.astro';
+const slug = 'guides/non-interactive';
+---
+<Doc slug={slug} title="Non-interactive mode">
+  <h1>Non-interactive mode</h1>
+  <p class="lede">Pipe cortex into scripts with <code>--prompt</code>.</p>
+
+  <h2>The split: stdout for answers, stderr for everything else</h2>
+  <p>
+    <code>--prompt</code> runs a single turn with no TUI, then exits. The assistant's answer
+    goes to <strong>stdout</strong>; tool activity, notices and errors go to
+    <strong>stderr</strong>. That separation lets you compose:
+  </p>
+  <pre><code>cortex --prompt "list every exported function in internal/ui" > api.txt</code></pre>
+  <pre><code>cortex --prompt "summarize the TODOs" | fold -s | head -40</code></pre>
+
+  <h2>Cancellation</h2>
+  <p>
+    In non-interactive mode, <code>Ctrl-C</code> ends the process — the ordinary expectation for a
+    one-shot command. This is different from interactive mode, where Ctrl-C cancels the turn.
+  </p>
+
+  <h2>Iteration limits</h2>
+  <p>
+    A <code>--prompt</code> run is bounded by <code>maxIterationsOnce</code>, a cap on how many
+    tool turns the agent may take before it must answer. Interactive mode is unbounded — a human
+    is watching, and Ctrl-C ends a turn that has lost its way.
+  </p>
+
+  <div class="callout info">
+    <span class="ico">ℹ️</span>
+    <div class="callout-body">
+      <strong>Why bounded?</strong> With no one watching, an agent that loops forever is a bill,
+      not a bug. The cap is deliberately conservative for one-shot use.
+    </div>
+  </div>
+
+  <h2>Combining with a config</h2>
+  <pre><code>cortex --config reviewer.yaml --prompt "review the last commit"</code></pre>
+  <p>
+    <code>--config</code> disables the cascade and reads only that file plus the environment.
+    Combine with <code>--prompt</code> for reproducible one-shot runs against a fixed configuration.
+  </p>
+
+  <div class="docs-pager"><Pager slug={slug} /></div>
+</Doc>

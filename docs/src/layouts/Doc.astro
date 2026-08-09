@@ -1,0 +1,34 @@
+---
+import Layout from './Layout.astro';
+import { nav } from '../nav';
+const { slug, title } = Astro.props;
+const base = '/docs';
+---
+<Layout title={title} description="cortex documentation">
+  <div class="docs-shell">
+    <!-- Sidebar -->
+    <aside class="docs-sidebar">
+      <div class="sb-brand">
+        <span class="glyph">◆</span>
+        <a href="/">cortex</a>
+      </div>
+      {nav.map(sec => (
+        <div class="sb-section">
+          <div class="sb-section-title">{sec.label}</div>
+          <ul>
+            {sec.pages.map(p => (
+              <li>
+                <a href={`${base}/${p.slug}/`} class={p.slug === slug ? 'active' : ''}>{p.title}</a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </aside>
+
+    <!-- Content -->
+    <main class="docs-content">
+      <slot />
+    </main>
+  </div>
+</Layout>

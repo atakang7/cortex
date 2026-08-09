@@ -1,0 +1,61 @@
+---
+import Doc from '../../../layouts/Doc.astro';
+import Pager from '../../../components/Pager.astro';
+const slug = 'guides/interactive';
+---
+<Doc slug={slug} title="Interactive mode">
+  <h1>Interactive mode</h1>
+  <p class="lede">The terminal UI — a transcript committed to your scrollback, not an alternate screen.</p>
+
+  <h2>Starting a session</h2>
+  <pre><code>cortex</code></pre>
+  <p>
+    cortex runs in your current working directory. It reads the repo, streams the model,
+    dispatches tools, and renders everything into your terminal's own scrollback. When cortex
+    exits, the finished session stays scrollable, searchable and copyable.
+  </p>
+
+  <h2>How the transcript works</h2>
+  <p>
+    The transcript is committed to your terminal's own scrollback rather than held in an
+    alternate screen. Only work still in flight redraws. This is a deliberate choice: a finished
+    session is something you scroll back through, search, and copy from — including after
+    cortex exits.
+  </p>
+
+  <h2>Interrupting a turn</h2>
+  <p>
+    Press <code>Ctrl-C</code> to interrupt the running turn. cortex treats Ctrl-C in raw mode
+    as a key, not a kill signal — it cancels the turn cleanly and returns you to the prompt.
+  </p>
+
+  <div class="callout info">
+    <span class="ico">ℹ️</span>
+    <div class="callout-body">
+      <strong>Why not SIGINT?</strong> In raw mode Ctrl-C arrives as a key. cortex binds it to
+      cancelling the turn rather than killing the process. Only signals the terminal cannot
+      deliver as a keystroke (<code>SIGTERM</code>, <code>SIGHUP</code>) end the program from
+      outside.
+    </div>
+  </div>
+
+  <h2>The banner</h2>
+  <p>
+    Each session opens with a banner showing the cortex version, the provider and model in use,
+    and the current turn count. The <code>name</code> field from your config appears here too.
+  </p>
+
+  <h2>Changing the model mid-session</h2>
+  <p>
+    When the model is changed interactively, cortex persists the new provider and model to your
+    user config. The same applies to the pruner. So the next session picks up where you left off.
+  </p>
+
+  <p>For the keys and commands available inside a session, see:</p>
+  <ul>
+    <li><a href="/docs/guides/keyboard/">Keyboard reference</a></li>
+    <li><a href="/docs/guides/commands/">Slash commands</a></li>
+  </ul>
+
+  <div class="docs-pager"><Pager slug={slug} /></div>
+</Doc>

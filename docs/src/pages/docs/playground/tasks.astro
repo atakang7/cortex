@@ -1,0 +1,85 @@
+---
+import Doc from '../../../layouts/Doc.astro';
+import Pager from '../../../components/Pager.astro';
+const slug = 'playground/tasks';
+---
+<Doc slug={slug} title="Tasks reference">
+  <h1>Tasks reference</h1>
+  <p class="lede">A task is a <code>seed/</code> project and a <code>TASK.txt</code> written the way a user would write it.</p>
+
+  <p>
+    Seeds ship with a passing test suite so a regression is unambiguous. The debugging tasks are the
+    useful ones — feature work rewards a competent model; debugging rewards one that plans, reads
+    before concluding, and knows what it has not checked.
+  </p>
+
+  <table>
+    <thead><tr><th>task</th><th>shape</th><th>what it tests</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>ledger</code></td>
+        <td>small CLI, suite passes</td>
+        <td>a feature across four files, with a backward-compatibility trap in the on-disk format</td>
+      </tr>
+      <tr>
+        <td><code>report</code></td>
+        <td>four modules, four failing tests</td>
+        <td>a bug whose symptom and cause are in different files, with a plausible wrong fix at the symptom</td>
+      </tr>
+      <tr>
+        <td><code>pipeline</code></td>
+        <td>16 modules, 41KB, three failing tests</td>
+        <td>a bug visible only by comparing two files neither of which is wrong alone; large enough to put the pruner under load</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout warn">
+    <span class="ico">⚠️</span>
+    <div class="callout-body">
+      <strong><code>pipeline</code> is the only task big enough to exercise the pruner.</strong> Keep
+      it that way — a curator that never runs is a curator nobody is testing.
+    </div>
+  </div>
+
+  <h2>What the playground found</h2>
+  <p>Each of these was invisible in the event stream and obvious in the wire log:</p>
+
+  <h3>Duplicated tool catalog (~2,100 tokens/call)</h3>
+  <p>
+    axon restated the whole tool catalog in the system prompt while the same tools were already sent
+    natively. ~2,100 duplicated tokens on every call.
+  </p>
+
+  <h3><code>write</code> steered to whole-file rewrites</h3>
+  <p>
+    Rewriting the tool's prose changed nothing; reordering the <code>mode</code> enum in its JSON
+    Schema changed everything. <strong>Where prose and schema disagree, the schema wins.</strong>
+  </p>
+
+  <h3><code>replace_string</code>'s not-found error recommended <code>replace_lines</code></h3>
+  <p>
+    A run took the advice, used line numbers from the same stale read, destroyed a docstring and
+    spent two calls repairing it.
+  </p>
+
+  <h3>The pruner fired on an empty log</h3>
+  <p>
+    The pruner fired on a context of 10,229 tokens and sent the curator an empty log — no task, no
+    blocks, 223 bytes. <code>ShouldFire</code> counts tokens while the recency window counts blocks,
+    so a few large files early in a task clear the floor while every block is still inside the
+    window. The curator answered <code>&#123;"park":[]&#125;</code>, correctly, having been shown nothing; the
+    context was unchanged, so it re-fired every <code>growth_tokens</code> after that.
+  </p>
+
+  <div class="callout tip">
+    <span class="ico">💡</span>
+    <div class="callout-body">
+      <strong>The pattern worth keeping:</strong> when the agent misbehaves, read <code>tools</code>
+      first to see what it did, then <code>prompt</code> to see what it was told. The cause is almost
+      always something it was told, and usually somewhere more structural than the role prompt.
+    </div>
+  </div>
+
+  <div class="docs-pager"><Pager slug={slug} /></div>
+</Doc>

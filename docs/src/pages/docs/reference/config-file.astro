@@ -1,0 +1,103 @@
+---
+import Doc from '../../../layouts/Doc.astro';
+import Pager from '../../../components/Pager.astro';
+const slug = 'reference/config-file';
+---
+<Doc slug={slug} title="Config file">
+  <h1>Config file reference</h1>
+  <p class="lede">Every field in a cortex config file, what it means and what it overrides.</p>
+
+  <h2>Locations</h2>
+  <table>
+    <thead><tr><th>Source</th><th>Path</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>User config</td><td><code>~/.config/cortex/config.yaml</code></td><td>Honours <code>XDG_CONFIG_HOME</code></td></tr>
+      <tr><td>Project config</td><td><code>./cortex.yaml</code></td><td>Overrides user config, field by field</td></tr>
+      <tr><td>Environment</td><td><code>LLM_*</code></td><td>Overrides both</td></tr>
+      <tr><td>Explicit</td><td><code>--config &lt;path&gt;</code></td><td>Disables the cascade entirely</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Fields</h2>
+  <table>
+    <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>name</code></td>
+        <td>string</td>
+        <td>Labels this agent personality (e.g. <code>cortex</code>, <code>reviewer</code>). Shown in the banner.</td>
+      </tr>
+      <tr>
+        <td><code>provider</code></td>
+        <td>string</td>
+        <td>The axon provider name (e.g. <code>openai</code>, <code>openrouter</code>). Supplies a default <code>base_url</code> for known providers.</td>
+      </tr>
+      <tr>
+        <td><code>model</code></td>
+        <td>string</td>
+        <td>The model within that provider (e.g. <code>gpt-4o</code>, <code>deepseek/deepseek-v3.2</code>).</td>
+      </tr>
+      <tr>
+        <td><code>system_prompt</code></td>
+        <td>string</td>
+        <td>
+          The agent's role text. A path is read from disk; prose is used as written. Omit to use the
+          built-in coding-agent prompt. <strong>Must not enumerate tools</strong> — axon appends the catalog.
+        </td>
+      </tr>
+      <tr>
+        <td><code>pruner</code></td>
+        <td>object</td>
+        <td>The secondary model for context pruning. See below.</td>
+      </tr>
+      <tr>
+        <td><code>mcp_servers</code></td>
+        <td>map</td>
+        <td>MCP subprocesses to spawn at startup. See below.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2><code>pruner</code></h2>
+  <table>
+    <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>pruner.provider</code></td><td>string</td><td>Provider for the pruner model. Defaults to the main provider if omitted.</td></tr>
+      <tr><td><code>pruner.model</code></td><td>string</td><td>The cheap, fast model used for context pruning. Empty means no pruner.</td></tr>
+    </tbody>
+  </table>
+
+  <h2><code>mcp_servers</code></h2>
+  <p>Each key is a server name. Each value has:</p>
+  <table>
+    <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>command</code></td><td>string</td><td>The executable to spawn.</td></tr>
+      <tr><td><code>args</code></td><td>[]string</td><td>Arguments passed to the command.</td></tr>
+      <tr><td><code>env</code></td><td>[]string</td><td>Environment variables for the spawned process. Literal values — no <code>$</code> expansion.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Environment overrides</h2>
+  <p>Only model selection is overridable by the environment. Credentials and endpoints are axon's concern.</p>
+  <table>
+    <thead><tr><th>Variable</th><th>Overrides</th></tr></thead>
+    <tbody>
+      <tr><td><code>LLM_PROVIDER</code></td><td><code>provider</code></td></tr>
+      <tr><td><code>LLM_MODEL</code></td><td><code>model</code></td></tr>
+      <tr><td><code>LLM_BASE_URL</code></td><td>The provider's default <code>base_url</code></td></tr>
+      <tr><td><code>LLM_API_KEY</code></td><td>API key (see <a href="/docs/reference/api-keys/">API keys</a>)</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout warn">
+    <span class="ico">⚠️</span>
+    <div class="callout-body">
+      <strong>Providers and credentials are not in this file.</strong> cortex does not define
+      endpoints or carry credentials — those live in axon's <code>providers.json</code> or the
+      <code>LLM_*</code> environment. cortex only names which provider and model to use.
+    </div>
+  </div>
+
+  <div class="docs-pager"><Pager slug={slug} /></div>
+</Doc>

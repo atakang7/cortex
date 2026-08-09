@@ -1,0 +1,75 @@
+---
+import Doc from '../../../layouts/Doc.astro';
+import Pager from '../../../components/Pager.astro';
+const slug = 'concepts/mcp-servers';
+---
+<Doc slug={slug} title="MCP servers">
+  <h1>MCP servers</h1>
+  <p class="lede">Spawn any Model Context Protocol server at startup; its tools are wired in automatically.</p>
+
+  <h2>What MCP is</h2>
+  <p>
+    The <a href="https://modelcontextprotocol.io/">Model Context Protocol</a> is an open standard
+    for exposing tools, resources and prompts to LLMs. An MCP server is a process that speaks the
+    protocol — GitHub's server, a filesystem server, a database server, anything.
+  </p>
+
+  <h2>Configuring a server</h2>
+  <pre><code>mcp_servers:
+  github:
+    command: docker
+    args: ["run", "-i", "--rm", "ghcr.io/github/github-mcp-server"]
+    env: ["GITHUB_TOKEN=ghp_..."]</code></pre>
+  <p>
+    Each entry under <code>mcp_servers</code> names a server and gives the command, arguments and
+    environment to spawn it. cortex starts the server at startup, discovers its tools over the
+    protocol, and wires them into the agent's tool set.
+  </p>
+
+  <h2>Auto-discovery</h2>
+  <p>
+    You don't enumerate the tools a server provides — cortex asks the server what it offers and adds
+    every tool to the catalog automatically. If the server adds a new tool, it shows up on the next
+    session with no config change.
+  </p>
+
+  <h2>Environment variables</h2>
+  <p>
+    The <code>env</code> list is passed to the spawned process. Use it for API tokens and any other
+    secrets the server needs. The values are strings; a leading <code>$</code> does
+    <strong>not</strong> expand here (unlike <code>api_key</code>), so pass the literal value or
+    interpolate from your shell before writing the config.
+  </p>
+
+  <div class="callout warn">
+    <span class="ico">⚠️</span>
+    <div class="callout-body">
+      <strong>Security:</strong> an MCP server runs with the same filesystem and network access as
+      the cortex process. Only spawn servers you trust.
+    </div>
+  </div>
+
+  <h2>Multiple servers</h2>
+  <pre><code>mcp_servers:
+  github:
+    command: docker
+    args: ["run", "-i", "--rm", "ghcr.io/github/github-mcp-server"]
+    env: ["GITHUB_TOKEN=..."]
+  sqlite:
+    command: npx
+    args: ["-y", "@modelcontextprotocol/server-sqlite", "--db-path", "./data.db"]</code></pre>
+  <p>Tools from all servers are merged into a single catalog. Name collisions are resolved by the server prefix.</p>
+
+  <div class="callout info">
+    <span class="ico">📖</span>
+    <div class="callout-body">
+      <strong>MCP is axon's.</strong> cortex spawns the servers in config; axon speaks the protocol,
+      discovers the tools, and merges them with its <a href="https://atakang7.github.io/axon/tools/builtins/">built-in tools</a>
+      into one catalog. The auto-discovery is axon's — see
+      <a href="https://atakang7.github.io/axon/tools/builtins/">axon's tools reference</a> for the
+      full toolset cortex gets on top of MCP.
+    </div>
+  </div>
+
+  <div class="docs-pager"><Pager slug={slug} /></div>
+</Doc>
