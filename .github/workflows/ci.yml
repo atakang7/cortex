@@ -17,6 +17,34 @@ jobs:
       - run: go vet ./...
       - run: go test ./...
 
+  install-contract:
+    name: documented install / release contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Validate source-build commands
+        run: |
+          set -euxo pipefail
+          go build -o cortex ./cmd/cortex
+          ./cortex --version
+      - name: Validate GoReleaser asset names used by docs
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: latest
+          args: release --snapshot --clean
+      - name: Assert documented platform archives exist
+        run: |
+          set -euxo pipefail
+          test -f dist/cortex-linux-amd64.tar.gz
+          test -f dist/cortex-linux-arm64.tar.gz
+          test -f dist/cortex-darwin-amd64.tar.gz
+          test -f dist/cortex-darwin-arm64.tar.gz
+          tar -tzf dist/cortex-linux-amd64.tar.gz | grep -qx cortex
+
   commitlint:
     name: Conventional Commits
     runs-on: ubuntu-latest
