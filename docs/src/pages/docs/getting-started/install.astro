@@ -5,32 +5,41 @@ const slug = 'getting-started/install';
 ---
 <Doc slug={slug} title="Install">
   <h1>Install</h1>
-  <p class="lede">Get the cortex binary on your machine in one of three ways.</p>
+  <p class="lede">Install the latest cortex release on Linux or macOS.</p>
 
-  <h2>go install</h2>
-  <p>If you have a Go toolchain, this is the fastest path:</p>
-  <pre><code>go install github.com/atakang7/cortex/cmd/cortex@latest</code></pre>
-  <p>The binary lands in your <code>$GOPATH/bin</code> — make sure that's on your <code>$PATH</code>.</p>
-
-  <h2>Pre-built binaries</h2>
+  <h2>Pre-built binary <span class="badge">recommended</span></h2>
   <p>
-    Every <a href="https://github.com/atakang7/cortex/releases">release</a> ships binaries for
-    <code>linux</code> and <code>darwin</code> on <code>amd64</code> and <code>arm64</code>.
-    Download the archive for your platform, extract it, and put the <code>cortex</code>
-    binary somewhere on your <code>$PATH</code>.
+    Releases publish <code>amd64</code> and <code>arm64</code> archives for Linux and macOS.
+    The asset names are stable, so GitHub's <code>releases/latest</code> URL always downloads
+    the newest published version.
   </p>
-  <pre><code>curl -L https://github.com/atakang7/cortex/releases/latest/download/cortex-linux-amd64.tar.gz \
-  | tar xz -C /usr/local/bin cortex</code></pre>
+  <pre><code>{`OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+ARCH=$(uname -m)
+[ "$ARCH" = "x86_64" ] && ARCH=amd64
+[ "$ARCH" = "aarch64" ] && ARCH=arm64
+[ "$ARCH" = "arm64" ] || [ "$ARCH" = "amd64" ] || { echo "unsupported architecture: $ARCH"; exit 1; }
 
-  <h2>Build from source</h2>
+curl -fsSL "https://github.com/atakang7/cortex/releases/latest/download/cortex-${OS}-${ARCH}.tar.gz" \
+  | sudo tar -xz -C /usr/local/bin cortex`}</code></pre>
+
+  <h2>Build the latest source</h2>
+  <p>Use this when you want the current <code>main</code> branch rather than the latest release:</p>
   <pre><code>git clone https://github.com/atakang7/cortex.git
 cd cortex
-go build -o cortex ./cmd/cortex</code></pre>
+go build -o cortex ./cmd/cortex
+sudo install -m 0755 cortex /usr/local/bin/cortex</code></pre>
+
+  <h2>About <code>go install</code></h2>
+  <p>
+    Do not use <code>go install github.com/atakang7/cortex/cmd/cortex@latest</code> for Cortex 2.x.
+    The repository's historical module path does not carry the <code>/v2</code> suffix required by
+    Go's semantic import versioning, so <code>@latest</code> can resolve the old v1 line instead of
+    the current Cortex release. Use the release binary above for a versioned install.
+  </p>
 
   <h2>Verify</h2>
-  <p>Check that it runs and prints build metadata:</p>
   <pre><code>cortex --version</code></pre>
-  <pre><code>cortex 1.2.3 (abc1234, built 2025-01-01T00:00:00Z)</code></pre>
+  <p>The version should match the latest release shown on GitHub.</p>
 
   <div class="callout info">
     <span class="ico">ℹ️</span>
