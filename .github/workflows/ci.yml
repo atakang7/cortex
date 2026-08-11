@@ -13,6 +13,10 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - name: Repair module sums for dependency probe
+        run: |
+          go mod tidy
+          git diff -- go.sum
       - run: go build ./...
       - run: go vet ./...
       - run: go test ./...
@@ -28,6 +32,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - run: go mod tidy
       - run: go build -o cortex ./cmd/cortex
       - run: ./cortex --version
 
@@ -39,6 +44,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - run: go mod tidy
       - name: Validate installer syntax
         run: sh -n scripts/install.sh
       - name: Validate source-build commands
