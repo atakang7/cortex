@@ -23,7 +23,9 @@ builds:
 
 archives:
   - id: cortex
-    name_template: "cortex_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    # Keep release asset names version-independent so GitHub's
+    # /releases/latest/download/... URLs always resolve to the newest build.
+    name_template: "cortex-{{ .Os }}-{{ .Arch }}"
 
 checksum:
   name_template: "checksums.txt"
