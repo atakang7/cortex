@@ -17,6 +17,50 @@ jobs:
       - run: go vet ./...
       - run: go test ./...
 
+  source-platforms:
+    name: source build / ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-13, macos-14]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go build -o cortex ./cmd/cortex
+      - run: ./cortex --version
+
+  install-contract:
+    name: documented install / release contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Validate installer syntax
+        run: sh -n scripts/install.sh
+      - name: Validate source-build commands
+        run: |
+          set -eux
+          go build -o cortex ./cmd/cortex
+          ./cortex --version
+      - name: Build release artifacts exactly as releases do
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: latest
+          args: release --snapshot --clean
+      - name: Assert every documented binary target exists and contains cortex
+        run: |
+          set -eux
+          for target in linux-amd64 linux-arm64 darwin-amd64 darwin-arm64; do
+            archive="dist/cortex-${target}.tar.gz"
+            test -f "$archive"
+            tar -tzf "$archive" | grep -qx cortex
+          done
+
   commitlint:
     name: Conventional Commits
     runs-on: ubuntu-latest

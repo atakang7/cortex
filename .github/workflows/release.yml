@@ -20,8 +20,21 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  verify:
+    name: verify release build
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go test ./...
+      - run: go build ./cmd/cortex
+
   release:
     name: semantic-release
+    needs: verify
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     outputs:
@@ -48,11 +61,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # semantic-release only determines the version and tags/publishes the
-      # release; it no longer writes release notes. GitHub's own generator
-      # (categorized PR list, contributors, compare link) fills the body
-      # instead, so there is one changelog source of truth — the release
-      # page — and nothing needs to be committed back to main.
       - name: Fill release notes from GitHub's auto-generated notes
         if: steps.semantic.outputs.new_release_published == 'true'
         env:
@@ -68,7 +76,7 @@ jobs:
     if: |
       always() &&
       (
-        (github.event_name == 'push' && needs.release.outputs.new_release_published == 'true') ||
+        (github.event_name == 'push' && needs.release.result == 'success' && needs.release.outputs.new_release_published == 'true') ||
         (github.event_name == 'workflow_dispatch' && inputs.tag != '')
       )
     runs-on: ubuntu-latest
