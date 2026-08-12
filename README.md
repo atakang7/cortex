@@ -27,7 +27,7 @@ Streaming chat · tool dispatch · append-only sessions · secondary-LLM context
 ```
 cortex/
 ├── getting-started/
-│   ├── install              — go install · pre-built binaries · build from source
+│   ├── install              — pre-built binaries · go install · build from source
 │   └── quick-start          — env vars · interactive & non-interactive · first config
 ├── guides/
 │   ├── configuration        — the three-layer cascade · fields · known providers
@@ -57,24 +57,24 @@ cortex/
 
 Get the cortex binary on your machine in one of three ways.
 
-### go install
+### Pre-built binaries (recommended)
 
-If you have a Go toolchain, this is the fastest path:
+Every [release](https://github.com/atakang7/cortex/releases) ships binaries for `linux` and `darwin` on `amd64` and `arm64`. Download and extract in one line:
 
 ```bash
-go install github.com/atakang7/cortex/cmd/cortex@latest
+curl -L https://github.com/atakang7/cortex/releases/latest/download/cortex-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz \
+  | tar xz -C /usr/local/bin cortex
+```
+
+### go install
+
+If you have a Go toolchain:
+
+```bash
+go install github.com/atakang7/cortex/v2/cmd/cortex@latest
 ```
 
 The binary lands in your `$GOPATH/bin` — make sure that's on your `$PATH`.
-
-### Pre-built binaries
-
-Every [release](https://github.com/atakang7/cortex/releases) ships binaries for `linux` and `darwin` on `amd64` and `arm64`. Download the archive for your platform, extract it, and put the `cortex` binary somewhere on your `$PATH`.
-
-```bash
-curl -L https://github.com/atakang7/cortex/releases/latest/download/cortex-linux-amd64.tar.gz \
-  | tar xz -C /usr/local/bin cortex
-```
 
 ### Build from source
 
