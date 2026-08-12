@@ -1,4 +1,4 @@
-module github.com/atakang7/cortex
+module github.com/atakang7/cortex/v2
 
 go 1.26.2
 

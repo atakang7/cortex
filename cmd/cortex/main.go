@@ -21,8 +21,8 @@ import (
 
 	"github.com/atakang7/axon/v2"
 
-	"github.com/atakang7/cortex/internal/config"
-	"github.com/atakang7/cortex/internal/ui"
+	"github.com/atakang7/cortex/v2/internal/config"
+	"github.com/atakang7/cortex/v2/internal/ui"
 )
 
 func main() {
