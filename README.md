@@ -46,7 +46,7 @@ cortex/
 │   ├── reading-traces       — timeline · prompt · system · tools · usage · errors
 │   └── tasks                — ledger · report · pipeline · what the playground found
 └── reference/
-    ├── cli                  — --config · --prompt · --verify · --version · exit codes
+    ├── cli                  — --config · --prompt · --version · exit codes
     ├── config-file          — every field · pruner · mcp_servers · env overrides
     └── api-keys             — resolution order · providers.json · the leading $
 ```
@@ -261,16 +261,6 @@ cortex --prompt "list every exported function in internal/ui" > api.txt
 cortex --prompt "summarize the TODOs" | fold -s | head -40
 ```
 
-### Objective verification
-
-When a command can judge the result, add `--verify`. A failing verifier is sent back to the same session for up to `--repair-attempts` extra turns, then run again.
-
-```bash
-cortex --prompt "fix the failing report total" --verify "python3 -m pytest -q" --repair-attempts 1
-```
-
-The extra turn only happens on failure, so cheap smoke tasks do not pay repair tokens when the first answer is already correct.
-
 ### Cancellation
 
 In non-interactive mode, `Ctrl-C` ends the process — the ordinary expectation for a one-shot command. This is different from interactive mode, where Ctrl-C cancels the turn.
@@ -302,6 +292,9 @@ Type a slash command at the prompt to control the session.
 | `/cd <path>` | Change the working directory. |
 | `/pwd` | Show the working directory. |
 | `/session` | Session file, turn count, pending undos. |
+| `/model` | Select a different model for this session. |
+| `/pruner` | Select a different pruner model for this session. |
+| `/switch` | Switch to a different saved session. |
 | `/help` | List the commands. |
 | `/quit` | Exit (`/exit`, `/q` also work). |
 
@@ -403,7 +396,7 @@ The tool catalog is appended by [axon](https://atakang7.github.io/axon/tools/bui
 |---|---|
 | Vanishes on exit. The session is gone the moment cortex stops — nothing to scroll, search or copy. | Stays in your terminal's own scrollback. A finished session is scrollable, searchable and copyable — even after cortex exits. Only work in flight redraws. |
 
-> **📖 Deeper into axon:** the loop, session, pruner and tools are all axon's. Read [axon's architecture](https://atakang7.github.io/axon/internals/architecture/), [context management](https://atakang7.github.io/axon/runtime/context/), and [the built-in tools](https://atakang7.github.io/axon/tools/builtins/) for the layer cortex builds on.
+> **📖 Deeper into axon:** the loop, session, pruner and tools are all axon's. Read [axon's architecture](https://atakang7.github.io/axon/internals/architecture/), [context management](https://atakang7.github.io/axon/concepts/context/), and [the built-in tools](https://atakang7.github.io/axon/tools/builtins/) for the layer cortex builds on.
 
 ---
 
@@ -437,7 +430,7 @@ The pruner's context decisions are as worth auditing as the agent's, and they ar
 
 When the pruner model is changed interactively, cortex saves the new provider and model to your user config. The next session picks it up automatically.
 
-> **📖 The pruner is axon's.** cortex only names *which* cheap model to run. axon owns the context windowing, the curator calls and the parking strategy — see [axon's context management](https://atakang7.github.io/axon/runtime/context/) for how it keeps long sessions stable. cortex taps the pruner model into the [trace log](#trace-log) so you can audit those decisions.
+> **📖 The pruner is axon's.** cortex only names *which* cheap model to run. axon owns the context windowing, the curator calls and the parking strategy — see [axon's context management](https://atakang7.github.io/axon/concepts/context/) for how it keeps long sessions stable. cortex taps the pruner model into the [trace log](#trace-log) so you can audit those decisions.
 
 ### When not to use a pruner
 
@@ -496,7 +489,7 @@ The trace opens with a `Describe` block recording the cortex version, the provid
 
 The trace log is the tool you reach for when the agent did something surprising and you want to know *why* — what prompt the model actually received, what context the pruner had decided to park, what the model said before the UI rendered it. It's prompt-engineering against reality, not against the abstraction.
 
-> **📖 The event stream is axon's.** axon emits structured events describing every reply — [the events reference](https://atakang7.github.io/axon/runtime/events/) covers them. The trace log adds the wire layer those events are built on top of. See [Reading traces](#reading-traces) for the tool that views them.
+> **📖 The event stream is axon's.** axon emits structured events describing every reply — [the events reference](https://atakang7.github.io/axon/concepts/events/) covers them. The trace log adds the wire layer those events are built on top of. See [Reading traces](#reading-traces) for the tool that views them.
 
 ---
 
@@ -619,7 +612,7 @@ Continue to [Running tasks](#running-tasks) and [Reading traces](#reading-traces
 2. It commits the seed in a fresh per-run git repo. `git diff` in the work directory is then *exactly* what the agent changed, with no other setup.
 3. A `.gitignore` is written so build artefacts (`__pycache__/`, `*.pyc`, `.pytest_cache/`) don't fill the diff with binary noise and bury the one source change that matters.
 4. It builds the cortex in the working tree — **not** whatever was on `$PATH`. The whole point is to test the code you're working on.
-5. It detects the seed project's verifier and passes it to cortex with `--verify` and one repair attempt by default.
+5. It detects the seed project's verifier (e.g. `go test ./...`, `python -m pytest -q`) and runs it in the work directory after cortex exits, recording the result.
 6. It runs cortex non-interactively on `tasks/<task>/TASK.txt`, writing stdout and stderr to the run directory.
 7. cortex announces its trace file on stderr; `run.sh` copies it into the run directory so the directory is self-contained once the cache is cleaned.
 8. It runs the seed project's verifier (`go test ./...`, `python -m pytest -q`, or `npm test`) and records the result.
@@ -648,8 +641,6 @@ runs/ledger-iter1/
 ```
 
 Batch runs keep going after failures and write a markdown summary under `runs/`. Use this for prompt or tool changes so one unlucky run does not hide the rest of the suite.
-
-Set `PLAYGROUND_REPAIR_ATTEMPTS=0` when you want to measure one unaided turn.
 
 > **💡 Comparing runs:** because the seed is never touched and each run is self-contained, two runs are directly comparable. Diff the `diff.patch` files, or compare `trace.jsonl` with the [trace views](#reading-traces).
 
@@ -757,8 +748,6 @@ cortex takes a small number of flags. Everything else lives in config.
 |---|---|---|
 | `--config <path>` | — | Path to a config file instead of the usual cascade. **Disables the cascade entirely** — only that file is read, plus the environment. |
 | `--prompt <text>` | — | Run one prompt non-interactively and exit. The answer goes to stdout; everything else to stderr. Bounded by `maxIterationsOnce`. |
-| `--verify <command>` | — | After `--prompt`, run a verifier command in the working directory. If it fails, cortex exits non-zero unless `--repair-attempts` allows another turn. |
-| `--repair-attempts <n>` | `0` | Number of extra repair turns allowed after `--verify` fails. The verifier runs again after each repair. |
 | `--version` | — | Print the version, commit and build date, then exit. |
 
 ### Modes
@@ -767,7 +756,6 @@ cortex takes a small number of flags. Everything else lives in config.
 |---|---|
 | `cortex` | Interactive (the TUI) |
 | `cortex --prompt "…"` | Non-interactive (one turn, then exit) |
-| `cortex --prompt "…" --verify "go test ./..."` | Non-interactive with objective verification |
 | `cortex --version` | Version only |
 
 ### Exit codes
