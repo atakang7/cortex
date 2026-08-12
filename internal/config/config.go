@@ -319,3 +319,165 @@ func looksLikePath(v string) bool {
 		strings.HasPrefix(v, "/") ||
 		strings.HasPrefix(v, "~/")
 }
+
+// SaveModel persists a model selection back to the user config file so the
+// choice survives restarts. The file is rewritten with yaml.Node so comments
+// and field order are preserved; only the top-level provider and model fields
+// are touched.
+//
+// The path is the user config (~/.config/cortex/config.yaml). If it does not
+// exist, it is created with just the provider and model, so a session that
+// started from environment overrides can still pin a model.
+func SaveModel(provider, model string) error {
+	path := userConfigPath()
+	if path == "" {
+		return errors.New("config: cannot locate user config dir")
+	}
+
+	var root yaml.Node
+	if data, err := os.ReadFile(path); err == nil {
+		if err := yaml.Unmarshal(data, &root); err != nil {
+			return fmt.Errorf("config: parse %s: %w", path, err)
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+
+	m := rootMapping(&root)
+	setMapField(m, "provider", provider)
+	setMapField(m, "model", model)
+
+	out, err := yaml.Marshal(&root)
+	if err != nil {
+		return fmt.Errorf("config: marshal %s: %w", path, err)
+	}
+
+	if dir := filepath.Dir(path); dir != "" {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return fmt.Errorf("config: mkdir %s: %w", dir, err)
+		}
+	}
+
+	return os.WriteFile(path, out, 0o644)
+}
+
+// SavePruner persists a pruner selection back to the user config file so the
+// choice survives restarts. The file is rewritten with yaml.Node so comments
+// and field order are preserved; only pruner.model (and pruner.provider when
+// it differs from the main provider) are touched.
+//
+// The path is the user config (~/.config/cortex/config.yaml). If it does not
+// exist, it is created with just the pruner block, so a session that started
+// from environment overrides can still pin a pruner.
+func SavePruner(provider, model string) error {
+	path := userConfigPath()
+	if path == "" {
+		return errors.New("config: cannot locate user config dir")
+	}
+
+	var root yaml.Node
+	if data, err := os.ReadFile(path); err == nil {
+		if err := yaml.Unmarshal(data, &root); err != nil {
+			return fmt.Errorf("config: parse %s: %w", path, err)
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+
+	m := rootMapping(&root)
+	prunerNode := findOrCreateMap(m, "pruner")
+	setMapField(prunerNode, "provider", provider)
+	setMapField(prunerNode, "model", model)
+
+	out, err := yaml.Marshal(&root)
+	if err != nil {
+		return fmt.Errorf("config: marshal %s: %w", path, err)
+	}
+
+	if dir := filepath.Dir(path); dir != "" {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return fmt.Errorf("config: mkdir %s: %w", dir, err)
+		}
+	}
+
+	return os.WriteFile(path, out, 0o644)
+}
+
+// userConfigPath returns the path to the user-level config file, or "" if the
+// config dir cannot be resolved.
+func userConfigPath() string {
+	dir := userConfigDir()
+	if dir == "" {
+		return ""
+	}
+	return filepath.Join(dir, "cortex", "config.yaml")
+}
+
+// rootMapping resolves the top-level mapping node from a parsed document.
+// yaml.Unmarshal into a yaml.Node yields a DocumentNode (Kind==DocumentNode)
+// whose first child is the mapping; when the file is empty the node is blank
+// and must be created. Callers that mutate fields must operate on this
+// mapping, not the document wrapper, or the marshal output is malformed.
+func rootMapping(root *yaml.Node) *yaml.Node {
+	if root.Kind == yaml.DocumentNode && len(root.Content) > 0 {
+		m := root.Content[0]
+		if m.Kind == yaml.MappingNode {
+			return m
+		}
+	}
+
+	m := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+	if root.Kind == 0 {
+		root.Kind = yaml.DocumentNode
+	}
+	root.Content = []*yaml.Node{m}
+	return m
+}
+
+// findOrCreateMap returns the mapping node under key in a mapping parent,
+// creating it (as a mapping) if absent. If key exists but is not a mapping,
+// it is replaced.
+func findOrCreateMap(parent *yaml.Node, key string) *yaml.Node {
+	if parent.Kind != yaml.MappingNode {
+		parent.Kind = yaml.MappingNode
+	}
+
+	for i := 0; i+1 < len(parent.Content); i += 2 {
+		if parent.Content[i].Value == key {
+			child := parent.Content[i+1]
+			if child.Kind != yaml.MappingNode {
+				child = &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+				parent.Content[i+1] = child
+			}
+			return child
+		}
+	}
+
+	child := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+	parent.Content = append(parent.Content,
+		&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key},
+		child,
+	)
+	return child
+}
+
+// setMapField sets a string field in a mapping node, creating or replacing it.
+func setMapField(m *yaml.Node, key, value string) {
+	if m.Kind != yaml.MappingNode {
+		m.Kind = yaml.MappingNode
+	}
+
+	for i := 0; i+1 < len(m.Content); i += 2 {
+		if m.Content[i].Value == key {
+			m.Content[i+1].Value = value
+			m.Content[i+1].Kind = yaml.ScalarNode
+			m.Content[i+1].Tag = "!!str"
+			return
+		}
+	}
+
+	m.Content = append(m.Content,
+		&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key},
+		&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: value},
+	)
+}

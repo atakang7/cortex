@@ -27,6 +27,62 @@ func (i modelItem) Title() string       { return i.model }
 func (i modelItem) Description() string { return i.provider }
 func (i modelItem) FilterValue() string { return i.provider + "/" + i.model }
 
+// sessionItem is one row in the session switcher list.
+type sessionItem struct {
+	meta axon.SessionMeta
+}
+
+func (i sessionItem) Title() string {
+	label := i.meta.Title
+	if label == "" {
+		label = i.meta.ID
+	}
+	if i.meta.Current {
+		return "● " + label
+	}
+	return label
+}
+
+// Description shows the session id, working directory, turn count and age, so
+// a user can tell sessions apart even when their titles overlap.
+func (i sessionItem) Description() string {
+	dir := i.meta.Cwd
+	if dir == "" {
+		dir = "(no cwd)"
+	}
+
+	parts := []string{i.meta.ID, dir}
+	if i.meta.Turn > 0 {
+		parts = append(parts, fmt.Sprintf("turn %d", i.meta.Turn))
+	}
+	if !i.meta.StartedAt.IsZero() {
+		parts = append(parts, humanAge(i.meta.StartedAt))
+	}
+	if i.meta.Current {
+		parts = append(parts, "current")
+	}
+
+	return strings.Join(parts, " · ")
+}
+
+func (i sessionItem) FilterValue() string { return i.meta.ID + " " + i.meta.Cwd }
+
+// humanAge renders a coarse "x ago" label for a timestamp, in minutes or
+// hours — enough to sort a switcher mentally without a full date.
+func humanAge(t time.Time) string {
+	d := time.Since(t).Round(time.Minute)
+	switch {
+	case d <= 0:
+		return "now"
+	case d < time.Hour:
+		return fmt.Sprintf("%dm ago", int(d.Minutes()))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%dh ago", int(d.Hours()))
+	default:
+		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
+	}
+}
+
 // model.go holds the UI's state and the rules for changing it. Everything the
 // user sees is derived from these fields; nothing here writes to the terminal
 // directly, and nothing here calls the model API. Update reacts, view.go
@@ -58,6 +114,18 @@ type Options struct {
 
 	// Settings provides the available endpoints and models for the picker.
 	Settings axon.Settings
+
+	// OnModelChanged is called when the user picks a new model from the
+	// /model list. It lets the caller persist the choice so it survives
+	// restarts. The callback runs on the UI goroutine and must not block.
+	// May be nil.
+	OnModelChanged func(provider, model string)
+
+	// OnPrunerChanged is called when the user picks a new pruner model from
+	// the /pruner list. It lets the caller persist the choice so it survives
+	// restarts. The callback runs on the UI goroutine and must not block.
+	// May be nil.
+	OnPrunerChanged func(provider, model string)
 }
 
 // Model is the Bubble Tea model. It is passed by value, so every field must
@@ -75,10 +143,19 @@ type Model struct {
 	spinner spinner.Model
 	width   int
 
-	settings      axon.Settings
-	picker        list.Model
-	pickingModel  bool
-	pickingPruner bool
+	settings       axon.Settings
+	picker         list.Model
+	pickingModel   bool
+	pickingPruner  bool
+	pickingSession bool
+
+	// onModelChanged persists a /model selection so it survives restarts.
+	// nil when the caller does not care.
+	onModelChanged func(provider, model string)
+
+	// onPrunerChanged persists a /pruner selection so it survives restarts.
+	// nil when the caller does not care.
+	onPrunerChanged func(provider, model string)
 
 	// busy is true from submitting a turn until Step returns. It gates input
 	// and drives the spinner.
@@ -101,20 +178,37 @@ type Model struct {
 	// scrollback and dropped from this slice, so it is normally empty or has
 	// a single entry.
 	cards []toolCard
+
+	// usage accumulates token accounting across the whole session, for the
+	// status line readout.
+	usage usage
+}
+
+// usage tracks token accounting the UI surfaces. Each completed API call adds
+// to the totals; the status line renders the running sum. The last call's
+// prompt tokens are kept separately as the active context size — how much of
+// the model's window the current conversation is filling.
+type usage struct {
+	prompt         int // cumulative prompt tokens across all calls
+	completion     int // cumulative completion tokens across all calls
+	lastPrompt     int // prompt tokens from the most recent call (active context)
+	lastCompletion int // completion tokens from the most recent call
 }
 
 // New builds the model. The program is not running yet, so this only
 // constructs — the first frame is produced by Init.
 func New(opts Options) Model {
 	m := Model{
-		agent:      opts.Agent,
-		turnCtx:    opts.Context,
-		modelName:  opts.ModelName,
-		prunerName: opts.PrunerName,
-		agentName:  opts.AgentName,
-		input:      newInput(),
-		spinner:    newSpinner(),
-		settings:   opts.Settings,
+		agent:           opts.Agent,
+		turnCtx:         opts.Context,
+		modelName:       opts.ModelName,
+		prunerName:      opts.PrunerName,
+		agentName:       opts.AgentName,
+		input:           newInput(),
+		spinner:         newSpinner(),
+		settings:        opts.Settings,
+		onModelChanged:  opts.OnModelChanged,
+		onPrunerChanged: opts.OnPrunerChanged,
 	}
 
 	var items []list.Item
@@ -207,34 +301,59 @@ func (m Model) Init() tea.Cmd {
 // Update is the single place UI state changes. It is organised by where a
 // message came from: the terminal, the runtime, or the turn command.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if m.pickingModel || m.pickingPruner {
+	if m.pickingModel || m.pickingPruner || m.pickingSession {
 		var cmd tea.Cmd
 		switch msg := msg.(type) {
 		case tea.KeyMsg:
 			if msg.Type == tea.KeyEsc {
 				m.pickingModel = false
 				m.pickingPruner = false
+				m.pickingSession = false
 				return m, nil
 			}
 			if msg.Type == tea.KeyEnter {
-				i, ok := m.picker.SelectedItem().(modelItem)
 				notice := ""
-				if ok {
-					newModel, err := m.settings.NewClient(i.provider, i.model)
-					if err == nil {
-						if m.pickingPruner {
+				switch {
+				case m.pickingPruner:
+					if i, ok := m.picker.SelectedItem().(modelItem); ok {
+						newModel, err := m.settings.NewClient(i.provider, i.model)
+						if err == nil {
 							m.agent.SetPrunerModel(newModel)
 							m.prunerName = i.model
 							notice = "pruner changed to " + i.model
+							if m.onPrunerChanged != nil {
+								m.onPrunerChanged(i.provider, i.model)
+							}
+						}
+					}
+				case m.pickingSession:
+					if i, ok := m.picker.SelectedItem().(sessionItem); ok {
+						if !i.meta.Current {
+							if err := m.agent.SwitchSession(i.meta.Path); err != nil {
+								m.pickingSession = false
+								return m, tea.Println(renderError(err.Error(), m.width))
+							}
+							notice = "switched to session " + i.meta.ID
 						} else {
+							notice = "already on this session"
+						}
+					}
+				default: // pickingModel
+					if i, ok := m.picker.SelectedItem().(modelItem); ok {
+						newModel, err := m.settings.NewClient(i.provider, i.model)
+						if err == nil {
 							m.agent.SetModel(newModel)
 							m.modelName = i.model
 							notice = "model changed to " + i.model
+							if m.onModelChanged != nil {
+								m.onModelChanged(i.provider, i.model)
+							}
 						}
 					}
 				}
 				m.pickingModel = false
 				m.pickingPruner = false
+				m.pickingSession = false
 				return m, tea.Println(renderNotice(notice, m.width))
 			}
 		case tea.WindowSizeMsg:
@@ -313,6 +432,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.stream = ""
 
 		return m, tea.Sequence(commit, tea.Println(renderAssistant(string(msg), m.width)))
+
+	case usageMsg:
+		m.usage.prompt += msg.PromptTokens
+		m.usage.completion += msg.CompletionTokens
+		m.usage.lastPrompt = msg.PromptTokens
+		m.usage.lastCompletion = msg.CompletionTokens
+		return m, nil
 
 	// ----- tool calls ------------------------------------------------------
 
@@ -494,6 +620,17 @@ func (m Model) runTurn(input string) tea.Cmd {
 	}
 }
 
+// buildSessionItems lists saved sessions as picker rows, marking the one the
+// agent is currently running as Current so the switcher can show it distinctly.
+func buildSessionItems(agent *axon.Agent) []list.Item {
+	metas := axon.ListSessions(agent.SessionsDir(), agent.SessionPath())
+	items := make([]list.Item, 0, len(metas))
+	for _, meta := range metas {
+		items = append(items, sessionItem{meta: meta})
+	}
+	return items
+}
+
 // applyCommand turns a command's report into state changes and output. The
 // command decided what happened; this decides what the screen does about it.
 func (m Model) applyCommand(res commandResult) (tea.Model, tea.Cmd) {
@@ -524,6 +661,17 @@ func (m Model) applyCommand(res commandResult) (tea.Model, tea.Cmd) {
 	if res.SelectPruner {
 		m.pickingPruner = true
 		m.picker.Title = "Select Pruner"
+		return m, nil
+	}
+
+	if res.SelectSession {
+		items := buildSessionItems(m.agent)
+		if len(items) == 0 {
+			return m, tea.Println(renderNotice("no saved sessions", m.width))
+		}
+		m.picker.SetItems(items)
+		m.picker.Title = "Select Session"
+		m.pickingSession = true
 		return m, nil
 	}
 

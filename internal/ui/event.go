@@ -128,6 +128,12 @@ func translate(e axon.Event) tea.Msg {
 
 	case axon.KindError:
 		return runtimeErrorMsg{Err: e.Err, Text: e.Text}
+
+	case axon.KindUsage:
+		if e.Usage == nil {
+			return nil
+		}
+		return usageMsg{PromptTokens: e.Usage.PromptTokens, CompletionTokens: e.Usage.CompletionTokens}
 	}
 
 	return nil
@@ -142,6 +148,12 @@ func translate(e axon.Event) tea.Msg {
 
 // tokenMsg is one chunk of streamed assistant text.
 type tokenMsg string
+
+// usageMsg carries token accounting for a completed API call.
+type usageMsg struct {
+	PromptTokens     int
+	CompletionTokens int
+}
 
 // reasoningMsg is one chunk of streamed reasoning text.
 type reasoningMsg string

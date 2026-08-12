@@ -73,7 +73,7 @@ func inputHeight(lines int) int {
 // box so it reads as a continuation of the transcript, and the status line
 // sits below so the box stays the visual centre.
 func (m Model) View() string {
-	if m.pickingModel || m.pickingPruner {
+	if m.pickingModel || m.pickingPruner || m.pickingSession {
 		return m.picker.View()
 	}
 
@@ -152,6 +152,16 @@ func (m Model) statusLine() string {
 		facts = append(facts, styleStatus.Render(fmt.Sprintf("turn %d", turn)))
 	}
 
+	if m.usage.lastPrompt > 0 {
+		facts = append(facts, styleStatus.Render(
+			fmt.Sprintf("ctx %d", m.usage.lastPrompt)))
+	}
+
+	if m.usage.prompt > 0 || m.usage.completion > 0 {
+		facts = append(facts, styleStatus.Render(
+			fmt.Sprintf("tokens %d↑ %d↓", m.usage.prompt, m.usage.completion)))
+	}
+
 	if m.busy {
 		facts = append(facts, styleStatus.Render(elapsed(m.turnStart)))
 	}
@@ -202,6 +212,10 @@ func (m Model) banner() string {
 	b.WriteString("\n")
 	b.WriteString(styleBanner.Render(m.agentName))
 	b.WriteString(styleStatus.Render("  " + m.modelName))
+
+	if title := m.agent.Session().Title; title != "" {
+		b.WriteString(styleStatus.Render("  · " + title))
+	}
 
 	if cwd := m.agent.Session().Cwd; cwd != "" {
 		b.WriteString("\n")
