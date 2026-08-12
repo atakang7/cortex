@@ -96,7 +96,9 @@ cortex --version
 cortex 1.2.3 (abc1234, built 2025-01-01T00:00:00Z)
 ```
 
-> **ℹ️ What's next?** cortex needs a model before it can start. Continue to [Quick start](#quick-start) to configure one.
+> **ℹ️** If you installed via `go install`, the version shows `cortex dev (none, built unknown)` — the build metadata is only injected by the release pipeline's ldflags. The binary itself works identically.
+
+> **What's next?** cortex needs a model before it can start. Continue to [Quick start](#quick-start) to configure one.
 
 ---
 
