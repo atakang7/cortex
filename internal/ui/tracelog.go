@@ -26,6 +26,7 @@ type traceLine struct {
 	Text    string       `json:"text,omitempty"`
 	Tool    *toolLine    `json:"tool,omitempty"`
 	Prune   *pruneLine   `json:"prune,omitempty"`
+	Usage   *usageLine   `json:"usage,omitempty"`
 	Session *sessionLine `json:"session,omitempty"`
 	Wire    *wireLine    `json:"wire,omitempty"`
 	Run     *RunInfo     `json:"run,omitempty"`
@@ -45,6 +46,11 @@ type pruneLine struct {
 	Before   int      `json:"before"`
 	After    int      `json:"after"`
 	Rejected []string `json:"rejected,omitempty"`
+}
+
+type usageLine struct {
+	PromptTokens     int `json:"prompt_tokens"`
+	CompletionTokens int `json:"completion_tokens"`
 }
 
 type sessionLine struct {
@@ -119,6 +125,9 @@ func (t *TraceLog) Emit(_ context.Context, e axon.Event) {
 	}
 	if p := e.Prune; p != nil {
 		line.Prune = &pruneLine{Before: p.Before, After: p.After, Rejected: p.Rejected}
+	}
+	if u := e.Usage; u != nil {
+		line.Usage = &usageLine{PromptTokens: u.PromptTokens, CompletionTokens: u.CompletionTokens}
 	}
 	if s := e.Session; s != nil {
 		line.Session = &sessionLine{ID: s.ID, Cwd: s.Cwd, Provider: s.Provider, Model: s.Model, Path: s.Path, PrunerOn: s.PrunerOn}
