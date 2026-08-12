@@ -13,10 +13,6 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - name: Repair module sums for dependency probe
-        run: |
-          go mod tidy
-          git diff -- go.sum
       - run: go build ./...
       - run: go vet ./...
       - run: go test ./...
@@ -25,14 +21,13 @@ jobs:
     name: source build / ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-13, macos-14]
+        os: [ubuntu-latest, macos-15-intel, macos-14]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - run: go mod tidy
       - run: go build -o cortex ./cmd/cortex
       - run: ./cortex --version
 
@@ -44,7 +39,6 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - run: go mod tidy
       - name: Validate installer syntax
         run: sh -n scripts/install.sh
       - name: Validate source-build commands
