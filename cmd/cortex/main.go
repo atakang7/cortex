@@ -48,6 +48,7 @@ func run() error {
 	var (
 		configPath  = flag.String("config", "", "path to a config file, instead of the usual cascade")
 		prompt      = flag.String("prompt", "", "run one prompt non-interactively and exit")
+		acpMode     = flag.Bool("acp", false, "run as an ACP v1 agent over stdio")
 		showVersion = flag.Bool("version", false, "print the version and exit")
 	)
 	flag.Parse()
@@ -56,6 +57,9 @@ func run() error {
 		fmt.Printf("cortex %s (%s, built %s)\n", version, commit, date)
 
 		return nil
+	}
+	if *acpMode && *prompt != "" {
+		return errors.New("--acp and --prompt cannot be used together")
 	}
 
 	cfg, err := config.Load(*configPath)
@@ -130,6 +134,9 @@ func run() error {
 		Cwd:            cwd,
 	})
 
+	if *acpMode {
+		return runACP(cfg, settings, model, prunerModel, trace)
+	}
 	if *prompt != "" {
 		return runOnce(cfg, settings, model, prunerModel, trace, *prompt)
 	}
