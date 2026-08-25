@@ -47,9 +47,19 @@ type acpRPCError struct {
 }
 
 type acpSession struct {
-	agent  *axon.Agent
-	mu     sync.Mutex
-	cancel context.CancelFunc
+	agent *axon.Agent
+
+	// turnMu serializes prompts so one Axon session can never execute two
+	// turns concurrently. stateMu is deliberately separate: cancellation
+	// must be able to reach a turn while turnMu is held by Agent.Step.
+	turnMu  sync.Mutex
+	stateMu sync.Mutex
+	cancel  context.CancelFunc
+
+	// Some embedders stream tokens and some only emit the final assistant
+	// event. Track this per turn so ACP always gets one copy of the answer,
+	// never an empty response and never streamed text plus a duplicate final.
+	streamed atomic.Bool
 }
 
 type acpServer struct {
@@ -59,10 +69,10 @@ type acpServer struct {
 	prunerModel axon.Model
 	trace       *ui.TraceLog
 
-	writeMu  sync.Mutex
+	writeMu   sync.Mutex
 	sessionMu sync.Mutex
-	sessions map[string]*acpSession
-	nextID   atomic.Uint64
+	sessions  map[string]*acpSession
+	nextID    atomic.Uint64
 }
 
 func runACP(cfg config.Config, settings axon.Settings, model axon.Model, prunerModel axon.Model, trace *ui.TraceLog) error {
@@ -154,14 +164,16 @@ func (s *acpServer) handle(ctx context.Context, req acpRequest) (any, *acpRPCErr
 		}
 
 		sid := fmt.Sprintf("cortex-%d", s.nextID.Add(1))
-		emit := fanOut(s.eventSink(sid), s.trace.Emit)
+		sess := &acpSession{}
+		emit := fanOut(s.eventSink(sid, sess), s.trace.Emit)
 		agent, err := newAgent(s.cfg, s.settings, s.model, s.prunerModel, emit, maxIterationsOnce)
 		if err != nil {
 			return nil, internalError(err)
 		}
+		sess.agent = agent
 
 		s.sessionMu.Lock()
-		s.sessions[sid] = &acpSession{agent: agent}
+		s.sessions[sid] = sess
 		s.sessionMu.Unlock()
 
 		return map[string]any{"sessionId": sid}, nil
@@ -208,9 +220,11 @@ func (s *acpServer) handleNotification(req acpRequest) {
 		return
 	}
 
-	sess.mu.Lock()
+	// Do not acquire turnMu here: the whole point of cancellation is to reach
+	// Agent.Step while the active prompt owns that lock.
+	sess.stateMu.Lock()
 	cancel := sess.cancel
-	sess.mu.Unlock()
+	sess.stateMu.Unlock()
 	if cancel != nil {
 		cancel()
 	}
@@ -249,13 +263,19 @@ func (s *acpServer) prompt(parent context.Context, raw json.RawMessage) (any, *a
 
 	// One turn at a time per ACP session. This is also what preserves the
 	// coding worker's Axon session across Setpoint CONTINUE iterations.
-	sess.mu.Lock()
-	defer sess.mu.Unlock()
+	sess.turnMu.Lock()
+	defer sess.turnMu.Unlock()
+
 	turnCtx, cancel := context.WithCancel(parent)
+	sess.streamed.Store(false)
+	sess.stateMu.Lock()
 	sess.cancel = cancel
+	sess.stateMu.Unlock()
 	defer func() {
 		cancel()
+		sess.stateMu.Lock()
 		sess.cancel = nil
+		sess.stateMu.Unlock()
 	}()
 
 	_, err := sess.agent.Step(turnCtx, text)
@@ -268,12 +288,23 @@ func (s *acpServer) prompt(parent context.Context, raw json.RawMessage) (any, *a
 	return map[string]any{"stopReason": "end_turn"}, nil
 }
 
-func (s *acpServer) eventSink(sessionID string) func(context.Context, axon.Event) {
+func (s *acpServer) eventSink(sessionID string, sess *acpSession) func(context.Context, axon.Event) {
 	return func(ctx context.Context, e axon.Event) {
 		var update map[string]any
 		switch e.Kind {
 		case axon.KindToken:
 			if e.Text == "" {
+				return
+			}
+			sess.streamed.Store(true)
+			update = map[string]any{
+				"sessionUpdate": "agent_message_chunk",
+				"content":       map[string]any{"type": "text", "text": e.Text},
+			}
+		case axon.KindAssistantEnd:
+			// Most Cortex providers stream KindToken. If a custom Axon model only
+			// returns a final message, still give ACP clients the answer exactly once.
+			if e.Text == "" || sess.streamed.Load() {
 				return
 			}
 			update = map[string]any{
@@ -356,6 +387,12 @@ func (s *acpServer) closeSession(id string) {
 	delete(s.sessions, id)
 	s.sessionMu.Unlock()
 	if sess != nil {
+		sess.stateMu.Lock()
+		cancel := sess.cancel
+		sess.stateMu.Unlock()
+		if cancel != nil {
+			cancel()
+		}
 		sess.agent.Interrupt()
 		sess.agent.Close()
 	}
