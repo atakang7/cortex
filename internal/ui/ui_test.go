@@ -436,20 +436,27 @@ func TestTruncateRespectsTheLimit(t *testing.T) {
 }
 
 // Token usage accumulates across API calls and shows in the status line, so a
-// session-long readout is available without a separate command.
+// session-long readout is available without a separate command. Cost from the
+// provider (OpenRouter reports it) accumulates the same way.
 func TestUsageAccumulatesAndRenders(t *testing.T) {
 	m := newTestModel(t)
 
-	m = apply(t, m, usageMsg{PromptTokens: 120, CompletionTokens: 30})
-	m = apply(t, m, usageMsg{PromptTokens: 80, CompletionTokens: 20})
+	m = apply(t, m, usageMsg{PromptTokens: 120, CompletionTokens: 30, Cost: 0.0012})
+	m = apply(t, m, usageMsg{PromptTokens: 80, CompletionTokens: 20, Cost: 0.0008})
 
 	if m.usage.prompt != 200 || m.usage.completion != 50 {
 		t.Fatalf("usage = %d↑ %d↓, want 200↑ 50↓", m.usage.prompt, m.usage.completion)
+	}
+	if got := m.usage.cost; got != 0.002 {
+		t.Fatalf("cost = %v, want 0.002", got)
 	}
 
 	view := m.View()
 	if !strings.Contains(view, "tokens 200↑ 50↓") {
 		t.Errorf("view = %q, want the status line to show accumulated tokens", view)
+	}
+	if !strings.Contains(view, "$0.0020") {
+		t.Errorf("view = %q, want the status line to show accumulated cost", view)
 	}
 }
 

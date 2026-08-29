@@ -158,8 +158,11 @@ func (m Model) statusLine() string {
 	}
 
 	if m.usage.prompt > 0 || m.usage.completion > 0 {
-		facts = append(facts, styleStatus.Render(
-			fmt.Sprintf("tokens %d↑ %d↓", m.usage.prompt, m.usage.completion)))
+		tokens := fmt.Sprintf("tokens %d↑ %d↓", m.usage.prompt, m.usage.completion)
+		if m.usage.cost > 0 {
+			tokens += fmt.Sprintf(" · $%.4f", m.usage.cost)
+		}
+		facts = append(facts, styleStatus.Render(tokens))
 	}
 
 	if m.busy {

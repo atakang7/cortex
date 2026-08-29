@@ -187,10 +187,12 @@ type Model struct {
 // usage tracks token accounting the UI surfaces. Each completed API call adds
 // to the totals; the status line renders the running sum. The last call's
 // prompt tokens are kept separately as the active context size — how much of
-// the model's window the current conversation is filling.
+// the model's window the current conversation is filling. Cost is the
+// cumulative USD charge when the provider reports one (OpenRouter does).
 type usage struct {
 	prompt         int // cumulative prompt tokens across all calls
 	completion     int // cumulative completion tokens across all calls
+	cost           float64 // cumulative USD cost across all calls
 	lastPrompt     int // prompt tokens from the most recent call (active context)
 	lastCompletion int // completion tokens from the most recent call
 }
@@ -436,6 +438,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case usageMsg:
 		m.usage.prompt += msg.PromptTokens
 		m.usage.completion += msg.CompletionTokens
+		m.usage.cost += msg.Cost
 		m.usage.lastPrompt = msg.PromptTokens
 		m.usage.lastCompletion = msg.CompletionTokens
 		return m, nil

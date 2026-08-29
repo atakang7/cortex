@@ -137,6 +137,7 @@ func run() error {
 	if *acpMode {
 		return runACP(cfg, settings, model, prunerModel, trace)
 	}
+
 	if *prompt != "" {
 		return runOnce(cfg, settings, model, prunerModel, trace, *prompt)
 	}

@@ -133,7 +133,7 @@ func translate(e axon.Event) tea.Msg {
 		if e.Usage == nil {
 			return nil
 		}
-		return usageMsg{PromptTokens: e.Usage.PromptTokens, CompletionTokens: e.Usage.CompletionTokens}
+		return usageMsg{PromptTokens: e.Usage.PromptTokens, CompletionTokens: e.Usage.CompletionTokens, Cost: e.Usage.Cost}
 	}
 
 	return nil
@@ -149,10 +149,12 @@ func translate(e axon.Event) tea.Msg {
 // tokenMsg is one chunk of streamed assistant text.
 type tokenMsg string
 
-// usageMsg carries token accounting for a completed API call.
+// usageMsg carries token accounting for a completed API call. Cost is the USD
+// charge for the call when the provider reports one; zero otherwise.
 type usageMsg struct {
 	PromptTokens     int
 	CompletionTokens int
+	Cost             float64
 }
 
 // reasoningMsg is one chunk of streamed reasoning text.
