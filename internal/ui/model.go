@@ -213,6 +213,15 @@ func New(opts Options) Model {
 		onPrunerChanged: opts.OnPrunerChanged,
 	}
 
+	// Seed usage from the session's persisted totals so the status line
+	// continues across restarts instead of resetting to zero. lastPrompt
+	// is left zero — the next call fills it.
+	if s := opts.Agent.Session(); s != nil {
+		m.usage.prompt = s.PromptTokens
+		m.usage.completion = s.CompletionTokens
+		m.usage.cost = s.Cost
+	}
+
 	var items []list.Item
 	for pName, p := range opts.Settings.Providers {
 		for _, mName := range p.ModelNames() {
@@ -334,6 +343,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							if err := m.agent.SwitchSession(i.meta.Path); err != nil {
 								m.pickingSession = false
 								return m, tea.Println(renderError(err.Error(), m.width))
+							}
+							// Re-seed usage from the switched-to session's
+							// persisted totals so the status line continues
+							// from that session's accumulated cost/tokens.
+							if s := m.agent.Session(); s != nil {
+								m.usage.prompt = s.PromptTokens
+								m.usage.completion = s.CompletionTokens
+								m.usage.cost = s.Cost
+								m.usage.lastPrompt = 0
+								m.usage.lastCompletion = 0
 							}
 							notice = "switched to session " + i.meta.ID
 						} else {
