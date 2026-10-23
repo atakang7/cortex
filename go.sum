@@ -12,6 +12,10 @@ github.com/atakang7/axon/v2 v2.0.10 h1:cTAzpR1kB70Qk+b6x51v+/7ti6/9BUiIifuAwl6Qx
 github.com/atakang7/axon/v2 v2.0.10/go.mod h1:SeQrs2vaWWp8kd6xaR+KxQIVmlyKf/6qM3ptqBWm/Fg=
 github.com/atakang7/axon/v2 v2.0.11 h1:W7jQRT3H21OroGUxZgsn+u8tdROtzjiT/h+Ei0CA904=
 github.com/atakang7/axon/v2 v2.0.11/go.mod h1:SeQrs2vaWWp8kd6xaR+KxQIVmlyKf/6qM3ptqBWm/Fg=
+github.com/atakang7/axon/v2 v2.0.12-0.20261023210016-8ac8573d4bfe h1:2cOEb8r9TS8yPI2NvVknfAh/PDO0tEanMGL3P3FSyNQ=
+github.com/atakang7/axon/v2 v2.0.12-0.20261023210016-8ac8573d4bfe/go.mod h1:jFwC0qtcqQYu4o0/lHLoQck0R1GW2sZb7raXWrn3t2A=
+github.com/atakang7/axon/v2 v2.0.12-0.20261023210235-d3fdc37304f7 h1:viOOftXGKGFuQTnBR+wWyRXLKrB7cc/AOnexHJxQakU=
+github.com/atakang7/axon/v2 v2.0.12-0.20261023210235-d3fdc37304f7/go.mod h1:jFwC0qtcqQYu4o0/lHLoQck0R1GW2sZb7raXWrn3t2A=
 github.com/atotto/clipboard v0.1.4 h1:EH0zSVneZPSuFR11BlR9YppQTVDbh5+16AmcJi4g1z4=
 github.com/atotto/clipboard v0.1.4/go.mod h1:ZY9tmq7sm5xIbd9bOK4onWV4S6X0u6GY7Vn0Yu86PYI=
 github.com/aymanbagabas/go-osc52/v2 v2.0.1 h1:HwpRHbFMcZLEVr42D4p7XBqjyuxQH5SMiErDT4WkJ2k=

@@ -17,6 +17,23 @@ jobs:
       - run: go vet ./...
       - run: go test ./...
 
+  windows:
+    name: Windows / build / test / artifact
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go build -o cortex.exe ./cmd/cortex
+      - run: ./cortex.exe --version
+      - run: go vet ./...
+      - run: go test -timeout 5m ./...
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cortex-windows-amd64
+          path: cortex.exe
+
   source-platforms:
     name: source build / ${{ matrix.os }}
     strategy:
@@ -60,6 +77,8 @@ jobs:
             test -f "$archive"
             tar -tzf "$archive" | grep -qx cortex
           done
+          test -f dist/cortex-windows-amd64.zip
+          unzip -Z1 dist/cortex-windows-amd64.zip | grep -qx cortex.exe
 
   commitlint:
     name: Conventional Commits

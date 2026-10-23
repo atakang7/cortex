@@ -78,6 +78,13 @@ The binary lands in your `$GOPATH/bin` — make sure that's on your `$PATH`.
 
 ### Build from source
 
+Native Windows builds are supported. With Git for Windows and Go installed,
+run the same source build in PowerShell, using `go build -o cortex.exe ./cmd/cortex`.
+Windows shell tools prefer Git Bash and use Windows Job Objects to stop whole
+process trees; WSL is not required. CI tests Windows and publishes a
+`cortex-windows-amd64` executable artifact. The release configuration also
+includes a Windows AMD64 ZIP for future releases.
+
 ```bash
 git clone https://github.com/atakang7/cortex.git
 cd cortex

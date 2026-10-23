@@ -10,19 +10,25 @@ builds:
     binary: cortex
     env:
       - CGO_ENABLED=0
-    # Windows is excluded: cortex depends on github.com/atakang7/axon/agent,
-    # whose process-group shell tools are POSIX-only.
     goos:
       - linux
       - darwin
+      - windows
     goarch:
       - amd64
       - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
     ldflags:
       - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
 
 archives:
   - id: cortex
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
     # Keep release asset names version-independent so GitHub's
     # /releases/latest/download/... URLs always resolve to the newest build.
     name_template: "cortex-{{ .Os }}-{{ .Arch }}"
