@@ -3,7 +3,7 @@ module github.com/atakang7/cortex/v2
 go 1.26.2
 
 require (
-	github.com/atakang7/axon/v2 v2.0.11
+	github.com/atakang7/axon/v2 v2.0.12-0.20261023210016-8ac8573d4bfe
 	github.com/charmbracelet/bubbles v1.0.0
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/lipgloss v1.1.0
