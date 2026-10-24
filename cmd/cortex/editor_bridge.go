@@ -64,7 +64,7 @@ func (b *editorBridge) state() map[string]any {
 	for _, s := range axon.ListSessions(b.agent.SessionsDir(), b.agent.SessionPath()) {
 		sessions = append(sessions, map[string]any{"id": s.ID, "path": s.Path, "cwd": s.Cwd, "title": s.Title, "turn": s.Turn, "started_at": s.StartedAt, "current": s.Current})
 	}
-	return map[string]any{"provider": b.cfg.Provider, "model": b.cfg.ModelName, "pruner_provider": b.cfg.Pruner.Provider, "pruner_model": b.cfg.Pruner.Model, "prune_mode": b.settings.Pruner.Mode, "providers": providers, "session": session, "session_items": sessions, "busy": b.busy, "usage": map[string]any{"prompt": s.PromptTokens, "completion": s.CompletionTokens, "cost": s.Cost}}
+	return map[string]any{"provider": b.cfg.Provider, "model": b.cfg.ModelName, "pruner_provider": b.cfg.Pruner.Provider, "pruner_model": b.cfg.Pruner.Model, "pruner_models": b.cfg.Pruner.Models, "prune_mode": b.settings.Pruner.Mode, "providers": providers, "session": session, "session_items": sessions, "busy": b.busy, "usage": map[string]any{"prompt": s.PromptTokens, "completion": s.CompletionTokens, "cost": s.Cost}}
 }
 func (b *editorBridge) respond(r editorRequest, err error) {
 	v := map[string]any{"type": "response", "id": r.ID, "ok": err == nil}
