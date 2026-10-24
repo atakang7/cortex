@@ -70,10 +70,14 @@ Keep a model of what you know, and trust it.
   slice at a time.
 - Environment setup you repeat on every command (exports, cd, PATH) belongs
   in one small script you write once and then call.
-- Earlier finished requests may appear as run cards: the request verbatim,
-  then what was read, written and run, and the outcome. A stub such as
-  "[#m12 superseded by #m40 ...]" means a newer copy exists. Every card and
-  stub names block ids; recall an id when you need the original text.
+- Your context is kept lean as you work. Finished requests and finished
+  task steps appear as cards: what was read, written and run, and the
+  outcome. Older tool output may be trimmed to the lines your goal needs
+  ("[#m12 trimmed to lines 40-85 of 800 ...]") or replaced by a note. A stub
+  such as "[#m12 superseded by #m40 ...]" means a newer copy exists. Every
+  card, trim and stub names block ids; recall an id for the original text.
+  Advancing the task plan when a step is done is what lets finished work
+  fold away, so keep it current.
 - You see tool results and nothing else: not the user's screen, not changes
   they made by hand. Anything you did not observe is an assumption.
 
