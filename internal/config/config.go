@@ -67,6 +67,8 @@ type MCPServer struct {
 type PrunerRef struct {
 	Provider string
 	Model    string
+	// Models enables unanimous free-model review instead of a single curator.
+	Models []string
 }
 
 // ErrNoModel means neither a config file nor the environment named a model.
@@ -96,8 +98,9 @@ type mcpSrv struct {
 }
 
 type prunerFile struct {
-	Provider string `yaml:"provider"`
-	Model    string `yaml:"model"`
+	Provider string   `yaml:"provider"`
+	Model    string   `yaml:"model"`
+	Models   []string `yaml:"models,omitempty"`
 }
 
 // ---------------------------------------------------------------------------
@@ -205,6 +208,11 @@ func overlay(dst *file, src file) {
 	setString(&dst.SystemPrompt, src.SystemPrompt)
 	setString(&dst.Pruner.Provider, src.Pruner.Provider)
 	setString(&dst.Pruner.Model, src.Pruner.Model)
+	if src.Pruner.Models != nil {
+		dst.Pruner.Models = append([]string{}, src.Pruner.Models...)
+	} else if src.Pruner.Model != "" {
+		dst.Pruner.Models = nil
+	}
 
 	if len(src.MCPServers) > 0 {
 		if dst.MCPServers == nil {
@@ -260,6 +268,22 @@ func finalize(f file, source string) (Config, error) {
 	cfg.Pruner = PrunerRef{
 		Provider: f.Pruner.Provider,
 		Model:    f.Pruner.Model,
+		Models:   append([]string(nil), f.Pruner.Models...),
+	}
+	if len(cfg.Pruner.Models) > 0 {
+		if len(cfg.Pruner.Models) < 2 || len(cfg.Pruner.Models) > 3 {
+			return Config{}, fmt.Errorf("pruner.models requires 2 or 3 independent free models")
+		}
+		seen := map[string]bool{}
+		for i, m := range cfg.Pruner.Models {
+			m = strings.TrimSpace(m)
+			if !strings.HasSuffix(m, ":free") || seen[m] {
+				return Config{}, fmt.Errorf("pruner.models must contain distinct :free model IDs")
+			}
+			seen[m] = true
+			cfg.Pruner.Models[i] = m
+		}
+		cfg.Pruner.Model = strings.Join(cfg.Pruner.Models, " + ")
 	}
 
 	prompt, err := resolveSystemPrompt(f.SystemPrompt)
@@ -388,6 +412,13 @@ func SavePruner(provider, model string) error {
 	prunerNode := findOrCreateMap(m, "pruner")
 	setMapField(prunerNode, "provider", provider)
 	setMapField(prunerNode, "model", model)
+	// An explicit single-model selection replaces a previously saved pool.
+	for i := 0; i+1 < len(prunerNode.Content); i += 2 {
+		if prunerNode.Content[i].Value == "models" {
+			prunerNode.Content = append(prunerNode.Content[:i], prunerNode.Content[i+2:]...)
+			break
+		}
+	}
 
 	out, err := yaml.Marshal(&root)
 	if err != nil {

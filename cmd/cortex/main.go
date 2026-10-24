@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
 
 	"github.com/atakang7/axon/v2"
@@ -48,6 +49,7 @@ func run() error {
 	var (
 		configPath  = flag.String("config", "", "path to a config file, instead of the usual cascade")
 		prompt      = flag.String("prompt", "", "run one prompt non-interactively and exit")
+		stdioMode   = flag.Bool("stdio", false, "run the VS Code JSON bridge")
 		acpMode     = flag.Bool("acp", false, "run as an ACP v1 agent over stdio")
 		showVersion = flag.Bool("version", false, "print the version and exit")
 	)
@@ -57,6 +59,9 @@ func run() error {
 		fmt.Printf("cortex %s (%s, built %s)\n", version, commit, date)
 
 		return nil
+	}
+	if (*acpMode && *stdioMode) || (*stdioMode && *prompt != "") {
+		return errors.New("choose only one of --stdio, --acp, --prompt")
 	}
 	if *acpMode && *prompt != "" {
 		return errors.New("--acp and --prompt cannot be used together")
@@ -83,25 +88,16 @@ func run() error {
 		return err
 	}
 
-	model, err := settings.NewClient(cfg.Provider, cfg.ModelName)
+	model, err := settings.NewFreeFirstClient(cfg.Provider, cfg.ModelName)
 	if err != nil {
 		return err
 	}
 
 	// A pruner is optional. When configured, it runs a cheap secondary model
 	// that parks stale context so the main model stays under its window.
-	var prunerModel axon.Model
-	if cfg.Pruner.Model != "" {
-		prunerProvider := cfg.Pruner.Provider
-		if prunerProvider == "" {
-			prunerProvider = cfg.Provider
-		}
-
-		pm, err := settings.NewClient(prunerProvider, cfg.Pruner.Model)
-		if err != nil {
-			return fmt.Errorf("pruner: %w", err)
-		}
-		prunerModel = pm
+	if len(cfg.Pruner.Models) > 0 || cfg.Pruner.Model != "" {
+		settings.Pruner.Semantic = true
+		settings.Pruner.Categories = true
 	}
 
 	// The trace log is a third, unfiltered event sink alongside whichever
@@ -122,7 +118,10 @@ func run() error {
 	// invisible in the event stream, which only reports how many tokens a
 	// pass moved and never why.
 	model = trace.Wiretap("main", model)
-	prunerModel = trace.Wiretap("pruner", prunerModel)
+	prunerModel, err := resolvePruner(cfg, settings, trace)
+	if err != nil {
+		return err
+	}
 
 	cwd, _ := os.Getwd()
 	trace.Describe(ui.RunInfo{
@@ -134,6 +133,9 @@ func run() error {
 		Cwd:            cwd,
 	})
 
+	if *stdioMode {
+		return runEditorBridge(cfg, settings, model, prunerModel, trace)
+	}
 	if *acpMode {
 		return runACP(cfg, settings, model, prunerModel, trace)
 	}
@@ -242,6 +244,9 @@ const maxIterationsOnce = 120
 // drift into configuring the agent differently; what legitimately differs
 // between them is passed in.
 func newAgent(cfg config.Config, settings axon.Settings, model axon.Model, prunerModel axon.Model, onEvent func(context.Context, axon.Event), maxIterations int) (*axon.Agent, error) {
+	if runtime.GOOS == "windows" {
+		cfg.SystemPrompt += "\n\nThis host is Windows. The exec tool runs Windows PowerShell, not bash. Use PowerShell syntax and Windows paths. Background commands also run PowerShell."
+	}
 	servers := make([]axon.MCPServer, 0, len(cfg.MCPServers))
 	for _, s := range cfg.MCPServers {
 		servers = append(servers, axon.MCPServer{Command: s.Command, Args: s.Args, Env: s.Env})

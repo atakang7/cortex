@@ -190,11 +190,11 @@ type Model struct {
 // the model's window the current conversation is filling. Cost is the
 // cumulative USD charge when the provider reports one (OpenRouter does).
 type usage struct {
-	prompt         int // cumulative prompt tokens across all calls
-	completion     int // cumulative completion tokens across all calls
+	prompt         int     // cumulative prompt tokens across all calls
+	completion     int     // cumulative completion tokens across all calls
 	cost           float64 // cumulative USD cost across all calls
-	lastPrompt     int // prompt tokens from the most recent call (active context)
-	lastCompletion int // completion tokens from the most recent call
+	lastPrompt     int     // prompt tokens from the most recent call (active context)
+	lastCompletion int     // completion tokens from the most recent call
 }
 
 // New builds the model. The program is not running yet, so this only
@@ -327,7 +327,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				switch {
 				case m.pickingPruner:
 					if i, ok := m.picker.SelectedItem().(modelItem); ok {
-						newModel, err := m.settings.NewClient(i.provider, i.model)
+						newModel, err := m.settings.NewPrunerClient(i.provider, i.model)
 						if err == nil {
 							m.agent.SetPrunerModel(newModel)
 							m.prunerName = i.model
@@ -361,7 +361,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				default: // pickingModel
 					if i, ok := m.picker.SelectedItem().(modelItem); ok {
-						newModel, err := m.settings.NewClient(i.provider, i.model)
+						newModel, err := m.settings.NewFreeFirstClient(i.provider, i.model)
 						if err == nil {
 							m.agent.SetModel(newModel)
 							m.modelName = i.model
@@ -675,14 +675,16 @@ func (m Model) applyCommand(res commandResult) (tea.Model, tea.Cmd) {
 	}
 
 	if res.SelectModel {
+		m.picker.SetItems(modelPickerItems(m.settings, false))
 		m.pickingModel = true
 		m.picker.Title = "Select Model"
 		return m, nil
 	}
 
 	if res.SelectPruner {
+		m.picker.SetItems(modelPickerItems(m.settings, true))
 		m.pickingPruner = true
-		m.picker.Title = "Select Pruner"
+		m.picker.Title = "Select Pruner (free first; capped fallback)"
 		return m, nil
 	}
 
