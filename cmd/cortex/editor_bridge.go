@@ -44,6 +44,7 @@ type editorRequest struct {
 	Query    string `json:"query"`
 	On       bool   `json:"on"`
 	Route    string `json:"route"`
+	Filter   string `json:"filter"`
 }
 
 func (b *editorBridge) write(v any) {
@@ -198,7 +199,7 @@ func (b *editorBridge) command(r editorRequest) error {
 		if err != nil {
 			return err
 		}
-		b.reply = map[string]any{"models": searchCatalog(models, r.Query, b.prefs.Favorites, 60), "favorites": favoriteModels(models, b.prefs.Favorites)}
+		b.reply = map[string]any{"models": searchCatalog(models, r.Query, b.prefs.Favorites, 1000, r.Filter == "free"), "favorites": favoriteModels(models, b.prefs.Favorites), "free": freeModels(models)}
 		return nil
 	case "favorite":
 		b.prefs.setFavorite(r.Model, r.On)

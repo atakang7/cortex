@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"math"
 	"testing"
 
@@ -66,5 +67,25 @@ func TestFavoritesAndSearch(t *testing.T) {
 	}
 	if got := searchCatalog(models, "x cod", nil, 10); len(got) != 1 || got[0].ID != "x/coder" {
 		t.Fatalf("search %v", got)
+	}
+}
+
+func TestFreeModelsAreListedAndFilterable(t *testing.T) {
+	var models []catalogModel
+	for i := 0; i < 80; i++ { // enough paid models to push free ones past any small cap
+		models = append(models, catalogModel{ID: fmt.Sprintf("a/paid-%02d", i), Name: fmt.Sprintf("A Paid %02d", i), Tools: true, Prompt: 1e-6, Completion: 2e-6})
+	}
+	models = append(models, catalogModel{ID: "z/coder:free", Name: "Z Coder (free)", Tools: true},
+		catalogModel{ID: "z/notes:free", Name: "Z Notes (free)", Tools: false})
+	all := searchCatalog(models, "", nil, 1000)
+	if len(all) != 81 || all[len(all)-1].ID != "z/coder:free" {
+		t.Fatalf("free tool model missing from the full list: %d", len(all))
+	}
+	free := searchCatalog(models, "", nil, 1000, true)
+	if len(free) != 1 || free[0].ID != "z/coder:free" {
+		t.Fatalf("free filter %v", free)
+	}
+	if f := freeModels(models); len(f) != 2 {
+		t.Fatalf("pruner list should include tool-less free models: %v", f)
 	}
 }

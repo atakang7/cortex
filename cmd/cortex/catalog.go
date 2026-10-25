@@ -192,9 +192,29 @@ func getJSON(ctx context.Context, url string, timeout time.Duration, into any) e
 	return json.NewDecoder(resp.Body).Decode(into)
 }
 
-// searchCatalog returns tool-capable models matching every word of query,
-// favourites first, then by name; at most limit.
-func searchCatalog(models []catalogModel, query string, favorites []string, limit int) []catalogModel {
+// isFree reports a model OpenRouter serves at no charge (":free" variants and
+// zero-priced models).
+func isFree(m catalogModel) bool {
+	return strings.HasSuffix(m.ID, ":free") || (m.Prompt == 0 && m.Completion == 0)
+}
+
+// freeModels are every free model, tools or not: the pruner only needs JSON.
+func freeModels(models []catalogModel) []catalogModel {
+	var out []catalogModel
+	for _, m := range models {
+		if isFree(m) {
+			out = append(out, m)
+		}
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
+}
+
+// searchCatalog returns tool-capable models matching every word of query
+// (only free ones when freeOnly), favourites first, then by name; at most
+// limit. The limit used to be 60, which cut the list off before most free
+// models in alphabetical order.
+func searchCatalog(models []catalogModel, query string, favorites []string, limit int, freeOnly ...bool) []catalogModel {
 	fav := map[string]bool{}
 	for _, f := range favorites {
 		fav[f] = true
@@ -202,7 +222,7 @@ func searchCatalog(models []catalogModel, query string, favorites []string, limi
 	words := strings.Fields(strings.ToLower(query))
 	var out []catalogModel
 	for _, m := range models {
-		if !m.Tools {
+		if !m.Tools || (len(freeOnly) > 0 && freeOnly[0] && !isFree(m)) {
 			continue
 		}
 		hay := strings.ToLower(m.ID + " " + m.Name)
