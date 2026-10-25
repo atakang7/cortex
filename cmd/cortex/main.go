@@ -245,7 +245,9 @@ const maxIterationsOnce = 120
 // between them is passed in.
 func newAgent(cfg config.Config, settings axon.Settings, model axon.Model, prunerModel axon.Model, onEvent func(context.Context, axon.Event), maxIterations int) (*axon.Agent, error) {
 	if runtime.GOOS == "windows" {
-		cfg.SystemPrompt += "\n\nThis host is Windows. The exec tool runs Windows PowerShell, not bash. Use PowerShell syntax and Windows paths. Background commands also run PowerShell."
+		// The exec tool prefers Git Bash and falls back to PowerShell; telling
+		// the model the wrong one made it write oracles that could not run.
+		cfg.SystemPrompt += "\n\nThis host is Windows. The exec tool runs commands in " + axon.ShellName() + "; write commands, and oracles, in that syntax. Background commands use the same shell."
 	}
 	servers := make([]axon.MCPServer, 0, len(cfg.MCPServers))
 	for _, s := range cfg.MCPServers {
