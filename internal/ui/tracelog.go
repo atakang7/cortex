@@ -73,9 +73,11 @@ type RunInfo struct {
 	Version        string `json:"version,omitempty"`
 	Provider       string `json:"provider,omitempty"`
 	Model          string `json:"model,omitempty"`
-	PrunerProvider string `json:"pruner_provider,omitempty"`
-	PrunerModel    string `json:"pruner_model,omitempty"`
-	Cwd            string `json:"cwd,omitempty"`
+	PrunerProvider   string `json:"pruner_provider,omitempty"`
+	PrunerModel      string `json:"pruner_model,omitempty"`
+	ExplorerProvider string `json:"explorer_provider,omitempty"`
+	ExplorerModel    string `json:"explorer_model,omitempty"`
+	Cwd              string `json:"cwd,omitempty"`
 }
 
 type wireLine struct {

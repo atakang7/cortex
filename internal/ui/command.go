@@ -35,8 +35,11 @@ type commandResult struct {
 	// SelectModel tells the UI to open the model selection list.
 	SelectModel bool
 
-	// SelectPruner tells the UI to open the pruner model selection list.
+	// SelectPruner tells the UI to open the checkpoint model selection list.
 	SelectPruner bool
+
+	// SelectExplorer tells the UI to open the explorer model selection list.
+	SelectExplorer bool
 
 	// SelectSession tells the UI to open the session switcher list.
 	SelectSession bool
@@ -135,9 +138,17 @@ var commands = map[string]command{
 
 	"/pruner": {
 		Name: "/pruner",
-		Help: "select a different pruner model for this session",
+		Help: "choose the model that decides checkpoints (default: the main model)",
 		Run: func(*axon.Agent, string) commandResult {
 			return commandResult{SelectPruner: true}
+		},
+	},
+
+	"/explorer": {
+		Name: "/explorer",
+		Help: "choose the cheaper, read-only model behind the explore tool, or none",
+		Run: func(*axon.Agent, string) commandResult {
+			return commandResult{SelectExplorer: true}
 		},
 	},
 

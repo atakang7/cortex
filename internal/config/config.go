@@ -46,9 +46,18 @@ type Config struct {
 	// MCPServers are subprocesses axon will spawn and harvest tools from.
 	MCPServers []MCPServer
 
-	// Pruner names the secondary model for context pruning. Both fields
-	// empty means no pruner — context grows until the provider refuses it.
+	// Pruner names the model that decides checkpoints: which older tool
+	// results stay in context. Empty means the main model decides, which is
+	// the default and usually the cheapest, since its prompt is cached.
 	Pruner PrunerRef
+
+	// Explorer names the cheaper, read-only model behind the explore tool.
+	// Empty means no explore tool.
+	Explorer ExplorerRef
+
+	// Warnings are notices about the config the user should see, such as a
+	// retired setting that is now ignored.
+	Warnings []string
 
 	// Source records which file this came from, for the status line. Empty
 	// when the built-in defaults were used.
@@ -62,13 +71,18 @@ type MCPServer struct {
 	Env     []string
 }
 
-// PrunerRef points at the secondary model used for context pruning.
-// Both fields empty means no pruner.
+// PrunerRef points at the model that decides checkpoints. An empty Model
+// means the main model.
 type PrunerRef struct {
 	Provider string
 	Model    string
-	// Models enables unanimous free-model review instead of a single curator.
-	Models []string
+}
+
+// ExplorerRef points at the explore tool's model. An empty Model means no
+// explore tool.
+type ExplorerRef struct {
+	Provider string
+	Model    string
 }
 
 // ErrNoModel means neither a config file nor the environment named a model.
@@ -88,6 +102,7 @@ type file struct {
 	Model        string            `yaml:"model"`
 	SystemPrompt string            `yaml:"system_prompt"`
 	Pruner       prunerFile        `yaml:"pruner"`
+	Explorer     modelFile         `yaml:"explorer"`
 	MCPServers   map[string]mcpSrv `yaml:"mcp_servers"`
 }
 
@@ -98,9 +113,16 @@ type mcpSrv struct {
 }
 
 type prunerFile struct {
-	Provider string   `yaml:"provider"`
-	Model    string   `yaml:"model"`
-	Models   []string `yaml:"models,omitempty"`
+	Provider string `yaml:"provider"`
+	Model    string `yaml:"model"`
+	// Models configured the free review pool removed in cortex 2.21. It is
+	// still read so an old config loads, and reported as ignored.
+	Models []string `yaml:"models,omitempty"`
+}
+
+type modelFile struct {
+	Provider string `yaml:"provider"`
+	Model    string `yaml:"model"`
 }
 
 // ---------------------------------------------------------------------------
@@ -210,9 +232,9 @@ func overlay(dst *file, src file) {
 	setString(&dst.Pruner.Model, src.Pruner.Model)
 	if src.Pruner.Models != nil {
 		dst.Pruner.Models = append([]string{}, src.Pruner.Models...)
-	} else if src.Pruner.Model != "" {
-		dst.Pruner.Models = nil
 	}
+	setString(&dst.Explorer.Provider, src.Explorer.Provider)
+	setString(&dst.Explorer.Model, src.Explorer.Model)
 
 	if len(src.MCPServers) > 0 {
 		if dst.MCPServers == nil {
@@ -265,25 +287,10 @@ func finalize(f file, source string) (Config, error) {
 		return Config{}, fmt.Errorf("config: model %q has no provider — set provider: in the config or export LLM_PROVIDER", cfg.ModelName)
 	}
 
-	cfg.Pruner = PrunerRef{
-		Provider: f.Pruner.Provider,
-		Model:    f.Pruner.Model,
-		Models:   append([]string(nil), f.Pruner.Models...),
-	}
-	if len(cfg.Pruner.Models) > 0 {
-		if len(cfg.Pruner.Models) < 2 || len(cfg.Pruner.Models) > 3 {
-			return Config{}, fmt.Errorf("pruner.models requires 2 or 3 independent free models")
-		}
-		seen := map[string]bool{}
-		for i, m := range cfg.Pruner.Models {
-			m = strings.TrimSpace(m)
-			if !strings.HasSuffix(m, ":free") || seen[m] {
-				return Config{}, fmt.Errorf("pruner.models must contain distinct :free model IDs")
-			}
-			seen[m] = true
-			cfg.Pruner.Models[i] = m
-		}
-		cfg.Pruner.Model = strings.Join(cfg.Pruner.Models, " + ")
+	cfg.Pruner = PrunerRef{Provider: f.Pruner.Provider, Model: f.Pruner.Model}
+	cfg.Explorer = ExplorerRef{Provider: f.Explorer.Provider, Model: f.Explorer.Model}
+	if len(f.Pruner.Models) > 0 {
+		cfg.Warnings = append(cfg.Warnings, "pruner.models, the free review pool, is retired and ignored: a cheap model no longer decides what leaves the context. Checkpoints are decided by "+orMain(cfg.Pruner.Model)+". Remove pruner.models from your config.")
 	}
 
 	prompt, err := resolveSystemPrompt(f.SystemPrompt)
@@ -304,6 +311,13 @@ func finalize(f file, source string) (Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func orMain(model string) string {
+	if model == "" {
+		return "the main model"
+	}
+	return model
 }
 
 // resolveSystemPrompt returns the role text. A value that names a file is
@@ -385,15 +399,24 @@ func SaveModel(provider, model string) error {
 	return os.WriteFile(path, out, 0o644)
 }
 
-// SavePruner persists a pruner selection back to the user config file so the
-// choice survives restarts. The file is rewritten with yaml.Node so comments
-// and field order are preserved; only pruner.model (and pruner.provider when
-// it differs from the main provider) are touched.
+// SavePruner persists the checkpoint model back to the user config file so
+// the choice survives restarts. An empty model clears it: the main model
+// decides. The retired free pool (pruner.models) is removed either way.
 //
 // The path is the user config (~/.config/cortex/config.yaml). If it does not
-// exist, it is created with just the pruner block, so a session that started
-// from environment overrides can still pin a pruner.
+// exist, it is created with just the pruner block. Comments and field order
+// are preserved.
 func SavePruner(provider, model string) error {
+	return saveRoleModel("pruner", provider, model)
+}
+
+// SaveExplorer persists the explore tool's model. An empty model clears it:
+// no explore tool.
+func SaveExplorer(provider, model string) error {
+	return saveRoleModel("explorer", provider, model)
+}
+
+func saveRoleModel(key, provider, model string) error {
 	path := userConfigPath()
 	if path == "" {
 		return errors.New("config: cannot locate user config dir")
@@ -409,15 +432,14 @@ func SavePruner(provider, model string) error {
 	}
 
 	m := rootMapping(&root)
-	prunerNode := findOrCreateMap(m, "pruner")
-	setMapField(prunerNode, "provider", provider)
-	setMapField(prunerNode, "model", model)
-	// An explicit single-model selection replaces a previously saved pool.
-	for i := 0; i+1 < len(prunerNode.Content); i += 2 {
-		if prunerNode.Content[i].Value == "models" {
-			prunerNode.Content = append(prunerNode.Content[:i], prunerNode.Content[i+2:]...)
-			break
-		}
+	node := findOrCreateMap(m, key)
+	deleteMapField(node, "models")
+	if model == "" {
+		deleteMapField(node, "provider")
+		deleteMapField(node, "model")
+	} else {
+		setMapField(node, "provider", provider)
+		setMapField(node, "model", model)
 	}
 
 	out, err := yaml.Marshal(&root)
@@ -511,6 +533,16 @@ func setMapField(m *yaml.Node, key, value string) {
 		&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key},
 		&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: value},
 	)
+}
+
+// deleteMapField removes key from a mapping node, if present.
+func deleteMapField(m *yaml.Node, key string) {
+	for i := 0; i+1 < len(m.Content); i += 2 {
+		if m.Content[i].Value == key {
+			m.Content = append(m.Content[:i], m.Content[i+2:]...)
+			return
+		}
+	}
 }
 
 // UserDir is cortex's per-user directory (the one holding config.yaml), or ""

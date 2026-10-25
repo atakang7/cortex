@@ -21,11 +21,19 @@ import (
 type modelItem struct {
 	provider string
 	model    string
+	// label replaces the title of a row that is not a model, such as "use
+	// the main model"; its model is empty.
+	label string
 }
 
-func (i modelItem) Title() string       { return i.model }
+func (i modelItem) Title() string {
+	if i.label != "" {
+		return i.label
+	}
+	return i.model
+}
 func (i modelItem) Description() string { return i.provider }
-func (i modelItem) FilterValue() string { return i.provider + "/" + i.model }
+func (i modelItem) FilterValue() string { return i.provider + "/" + i.model + i.label }
 
 // sessionItem is one row in the session switcher list.
 type sessionItem struct {
@@ -105,9 +113,12 @@ type Options struct {
 	// ModelName is shown in the status line, e.g. "gpt-4o".
 	ModelName string
 
-	// PrunerName is the curator model shown in the status line, e.g.
-	// "gpt-4o-mini". Empty means no pruner is configured.
+	// PrunerName is the model that decides checkpoints, shown in the status
+	// line. Empty means the main model decides.
 	PrunerName string
+
+	// ExplorerName is the explore tool's model. Empty means no explorer.
+	ExplorerName string
 
 	// AgentName labels the personality in the banner, e.g. "reviewer".
 	AgentName string
@@ -121,11 +132,15 @@ type Options struct {
 	// May be nil.
 	OnModelChanged func(provider, model string)
 
-	// OnPrunerChanged is called when the user picks a new pruner model from
-	// the /pruner list. It lets the caller persist the choice so it survives
-	// restarts. The callback runs on the UI goroutine and must not block.
-	// May be nil.
+	// OnPrunerChanged is called when the user picks a checkpoint model from
+	// the /pruner list; an empty model means the main model. It lets the
+	// caller persist the choice so it survives restarts. The callback runs on
+	// the UI goroutine and must not block. May be nil.
 	OnPrunerChanged func(provider, model string)
+
+	// OnExplorerChanged is OnPrunerChanged for the /explorer list; an empty
+	// model turns the explorer off. May be nil.
+	OnExplorerChanged func(provider, model string)
 }
 
 // Model is the Bubble Tea model. It is passed by value, so every field must
@@ -135,9 +150,10 @@ type Model struct {
 	agent   *axon.Agent
 	turnCtx context.Context
 
-	modelName  string
-	prunerName string
-	agentName  string
+	modelName    string
+	prunerName   string
+	explorerName string
+	agentName    string
 
 	input   textarea.Model
 	spinner spinner.Model
@@ -145,17 +161,19 @@ type Model struct {
 
 	settings       axon.Settings
 	picker         list.Model
-	pickingModel   bool
-	pickingPruner  bool
-	pickingSession bool
+	pickingModel    bool
+	pickingPruner   bool
+	pickingExplorer bool
+	pickingSession  bool
 
 	// onModelChanged persists a /model selection so it survives restarts.
 	// nil when the caller does not care.
 	onModelChanged func(provider, model string)
 
-	// onPrunerChanged persists a /pruner selection so it survives restarts.
-	// nil when the caller does not care.
-	onPrunerChanged func(provider, model string)
+	// onPrunerChanged and onExplorerChanged persist /pruner and /explorer
+	// selections. nil when the caller does not care.
+	onPrunerChanged   func(provider, model string)
+	onExplorerChanged func(provider, model string)
 
 	// busy is true from submitting a turn until Step returns. It gates input
 	// and drives the spinner.
@@ -204,13 +222,15 @@ func New(opts Options) Model {
 		agent:           opts.Agent,
 		turnCtx:         opts.Context,
 		modelName:       opts.ModelName,
-		prunerName:      opts.PrunerName,
-		agentName:       opts.AgentName,
-		input:           newInput(),
-		spinner:         newSpinner(),
-		settings:        opts.Settings,
-		onModelChanged:  opts.OnModelChanged,
-		onPrunerChanged: opts.OnPrunerChanged,
+		prunerName:        opts.PrunerName,
+		explorerName:      opts.ExplorerName,
+		agentName:         opts.AgentName,
+		input:             newInput(),
+		spinner:           newSpinner(),
+		settings:          opts.Settings,
+		onModelChanged:    opts.OnModelChanged,
+		onPrunerChanged:   opts.OnPrunerChanged,
+		onExplorerChanged: opts.OnExplorerChanged,
 	}
 
 	// Seed usage from the session's persisted totals so the status line
@@ -312,14 +332,12 @@ func (m Model) Init() tea.Cmd {
 // Update is the single place UI state changes. It is organised by where a
 // message came from: the terminal, the runtime, or the turn command.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if m.pickingModel || m.pickingPruner || m.pickingSession {
+	if m.picking() {
 		var cmd tea.Cmd
 		switch msg := msg.(type) {
 		case tea.KeyMsg:
 			if msg.Type == tea.KeyEsc {
-				m.pickingModel = false
-				m.pickingPruner = false
-				m.pickingSession = false
+				m.stopPicking()
 				return m, nil
 			}
 			if msg.Type == tea.KeyEnter {
@@ -327,15 +345,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				switch {
 				case m.pickingPruner:
 					if i, ok := m.picker.SelectedItem().(modelItem); ok {
-						newModel, err := m.settings.NewPrunerClient(i.provider, i.model)
-						if err == nil {
-							m.agent.SetPrunerModel(newModel)
-							m.prunerName = i.model
-							notice = "pruner changed to " + i.model
-							if m.onPrunerChanged != nil {
-								m.onPrunerChanged(i.provider, i.model)
-							}
-						}
+						notice = m.selectPruner(i)
+					}
+				case m.pickingExplorer:
+					if i, ok := m.picker.SelectedItem().(modelItem); ok {
+						notice = m.selectExplorer(i)
 					}
 				case m.pickingSession:
 					if i, ok := m.picker.SelectedItem().(sessionItem); ok {
@@ -372,9 +386,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						}
 					}
 				}
-				m.pickingModel = false
-				m.pickingPruner = false
-				m.pickingSession = false
+				m.stopPicking()
 				return m, tea.Println(renderNotice(notice, m.width))
 			}
 		case tea.WindowSizeMsg:
@@ -415,9 +427,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case sessionStartMsg:
 		text := fmt.Sprintf("session started · %s/%s", msg.Provider, msg.Model)
-		if msg.PrunerOn {
-			text += " · pruner on"
-		}
 		return m, tea.Println(renderNotice(text, m.width))
 
 	case sessionEndMsg:
@@ -500,17 +509,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// ----- runtime chatter -------------------------------------------------
 
 	case pruneStartMsg:
-		return m, tea.Println(renderPruner(fmt.Sprintf("pruning context (%s tokens)...", compactCount(msg.Before)), m.width))
+		return m, tea.Println(renderPruner(fmt.Sprintf("checkpoint: choosing what stays (%s tokens)...", compactCount(msg.Before)), m.width))
 
 	case pruneEndMsg:
-		text := fmt.Sprintf("context pruned · %s → %s tokens",
+		text := fmt.Sprintf("context %s → %s tokens",
 			compactCount(msg.Before), compactCount(msg.After))
-		// The curator naming a block it could not park is a note about the
-		// curator, not a failed pass — the arrow above already says what the
-		// pass achieved.
+		// Entries the checkpoint could not apply are a note about its call,
+		// not a failed pass — the arrow above already says what it achieved.
 		if n := len(msg.Rejected); n > 0 {
-			text += fmt.Sprintf(" · ignored %d invented id(s): %s",
-				n, strings.Join(msg.Rejected, ", "))
+			text += fmt.Sprintf(" · %d entr(ies) ignored: %s",
+				n, strings.Join(msg.Rejected, "; "))
 		}
 		return m, tea.Println(renderPruner(text, m.width))
 
@@ -675,16 +683,23 @@ func (m Model) applyCommand(res commandResult) (tea.Model, tea.Cmd) {
 	}
 
 	if res.SelectModel {
-		m.picker.SetItems(modelPickerItems(m.settings, false))
+		m.picker.SetItems(modelPickerItems(m.settings, ""))
 		m.pickingModel = true
 		m.picker.Title = "Select Model"
 		return m, nil
 	}
 
 	if res.SelectPruner {
-		m.picker.SetItems(modelPickerItems(m.settings, true))
+		m.picker.SetItems(modelPickerItems(m.settings, "main model decides (default)"))
 		m.pickingPruner = true
-		m.picker.Title = "Select Pruner (free first; capped fallback)"
+		m.picker.Title = "Select checkpoint model"
+		return m, nil
+	}
+
+	if res.SelectExplorer {
+		m.picker.SetItems(modelPickerItems(m.settings, "no explorer"))
+		m.pickingExplorer = true
+		m.picker.Title = "Select explorer model (read-only)"
 		return m, nil
 	}
 

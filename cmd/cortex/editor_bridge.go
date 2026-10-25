@@ -74,7 +74,11 @@ func (b *editorBridge) state() map[string]any {
 	for _, s := range axon.ListSessions(b.agent.SessionsDir(), b.agent.SessionPath()) {
 		sessions = append(sessions, map[string]any{"id": s.ID, "path": s.Path, "cwd": s.Cwd, "title": s.Title, "turn": s.Turn, "started_at": s.StartedAt, "current": s.Current})
 	}
-	return map[string]any{"provider": b.cfg.Provider, "model": b.cfg.ModelName, "pruner_provider": b.cfg.Pruner.Provider, "pruner_model": b.cfg.Pruner.Model, "pruner_models": b.cfg.Pruner.Models, "prune_mode": b.settings.Pruner.Mode, "providers": providers, "session": session, "session_items": sessions, "busy": b.busy, "usage": map[string]any{"prompt": s.PromptTokens, "completion": s.CompletionTokens, "cost": s.Cost, "cached": s.CachedTokens, "requests": s.Requests}, "goal": s.ActiveGoalView(),
+	// An empty pruner_model means the main model decides checkpoints; an
+	// empty explorer_model means no explore tool.
+	return map[string]any{"provider": b.cfg.Provider, "model": b.cfg.ModelName, "pruner_provider": b.cfg.Pruner.Provider, "pruner_model": b.cfg.Pruner.Model, "explorer_provider": b.cfg.Explorer.Provider, "explorer_model": b.cfg.Explorer.Model,
+		"prune_mode": b.settings.Pruner.Mode, "checkpoint_tokens": b.settings.Pruner.Trigger(), "checkpoints": len(s.Checkpoints),
+		"providers": providers, "session": session, "session_items": sessions, "busy": b.busy, "usage": map[string]any{"prompt": s.PromptTokens, "completion": s.CompletionTokens, "cost": s.Cost, "cached": s.CachedTokens, "requests": s.Requests, "explorer": s.ExplorerTokens}, "goal": s.ActiveGoalView(),
 		"favorites": b.prefs.Favorites, "route": b.route, "route_auto": b.prefs.Route == "" || b.prefs.Model != b.cfg.ModelName, "openrouter": isOpenRouterEndpoint(b.settings, b.cfg.Provider)}
 }
 func (b *editorBridge) respond(r editorRequest, err error) {
@@ -91,18 +95,21 @@ func (b *editorBridge) respond(r editorRequest, err error) {
 	}
 	b.write(v)
 }
-func runEditorBridge(cfg config.Config, settings axon.Settings, model axon.Model, pruner axon.Model, trace *ui.TraceLog) error {
+func runEditorBridge(cfg config.Config, settings axon.Settings, model axon.Model, side sideModels, trace *ui.TraceLog) error {
 	b := &editorBridge{cfg: cfg, settings: settings, trace: trace, prefs: loadModelPrefs()}
 	if e, ok := settings.Providers[cfg.Provider]; ok {
 		b.route = e.Models[cfg.ModelName].Route // applied at startup by run
 	}
 	var err error
-	b.agent, err = newAgent(cfg, settings, model, pruner, fanOut(b.emit, trace.Emit), maxIterationsOnce)
+	b.agent, err = newAgent(cfg, settings, model, side, fanOut(b.emit, trace.Emit), maxIterationsOnce)
 	if err != nil {
 		return err
 	}
 	defer b.agent.Close()
 	b.write(map[string]any{"type": "ready", "state": b.state()})
+	for _, w := range cfg.Warnings {
+		b.write(map[string]any{"type": "notice", "text": w})
+	}
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Buffer(make([]byte, 65536), 16*1024*1024)
 	for scanner.Scan() {
@@ -168,6 +175,11 @@ func runEditorBridge(cfg config.Config, settings axon.Settings, model axon.Model
 }
 func (b *editorBridge) command(r editorRequest) error {
 	switch r.Type {
+	case "context":
+		// The next request as the model will see it, block by block. Commands
+		// only run between turns, so the session is not being written to.
+		b.reply = b.agent.ContextSnapshot()
+		return nil
 	case "get_state":
 		return nil
 	case "reset":
@@ -227,28 +239,54 @@ func (b *editorBridge) command(r editorRequest) error {
 			return err
 		}
 		return b.useModel(b.cfg.Provider, b.cfg.ModelName)
-	case "select_model", "select_pruner":
-		if r.Type == "select_model" {
-			// A newly picked model starts on automatic provider choice.
-			b.prefs.Provider, b.prefs.Model, b.prefs.Route = r.Provider, r.Model, ""
-			if err := saveModelPrefs(b.prefs); err != nil {
-				return err
-			}
-			return b.useModel(r.Provider, r.Model)
+	case "select_model":
+		// A newly picked model starts on automatic provider choice.
+		b.prefs.Provider, b.prefs.Model, b.prefs.Route = r.Provider, r.Model, ""
+		if err := saveModelPrefs(b.prefs); err != nil {
+			return err
 		}
-		model, err := b.settings.NewPrunerClient(r.Provider, r.Model)
+		return b.useModel(r.Provider, r.Model)
+	case "select_pruner":
+		// An empty model hands checkpoints back to the main model.
+		model, err := b.sideModel("pruner", r)
 		if err != nil {
 			return err
 		}
 		if err := config.SavePruner(r.Provider, r.Model); err != nil {
 			return err
 		}
-		b.agent.SetPrunerModel(b.trace.Wiretap("pruner", model))
+		b.agent.SetPrunerModel(model)
 		b.cfg.Pruner = config.PrunerRef{Provider: r.Provider, Model: r.Model}
+		return nil
+	case "select_explorer":
+		// An empty model turns the explore tool off.
+		model, err := b.sideModel("explorer", r)
+		if err != nil {
+			return err
+		}
+		if err := config.SaveExplorer(r.Provider, r.Model); err != nil {
+			return err
+		}
+		b.agent.SetExplorerModel(model)
+		b.cfg.Explorer = config.ExplorerRef{Provider: r.Provider, Model: r.Model}
 		return nil
 	default:
 		return fmt.Errorf("Unknown editor command %q", r.Type)
 	}
+}
+
+// sideModel builds the client for a pruner or explorer choice; an empty model
+// is a nil client, the role's default. A model without a provider takes the
+// main model's.
+func (b *editorBridge) sideModel(role string, r editorRequest) (axon.Model, error) {
+	if r.Model == "" {
+		return nil, nil
+	}
+	client, err := b.settings.NewClient(orProvider(r.Provider, b.cfg.Provider), r.Model)
+	if err != nil {
+		return nil, err
+	}
+	return b.trace.Wiretap(role, client), nil
 }
 
 // useModel switches the agent to provider/model, routed to the user's chosen

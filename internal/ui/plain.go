@@ -64,9 +64,6 @@ func (p *Plain) Emit(_ context.Context, e axon.Event) {
 			return
 		}
 		text := fmt.Sprintf("session started · %s/%s", e.Session.Provider, e.Session.Model)
-		if e.Session.PrunerOn {
-			text += " · pruner on"
-		}
 		p.line(renderNotice(text, p.width))
 
 	case axon.KindSessionEnd:
@@ -124,13 +121,13 @@ func (p *Plain) Emit(_ context.Context, e axon.Event) {
 		if e.Prune == nil {
 			return
 		}
-		p.line(renderPruner(fmt.Sprintf("pruning context (%s tokens)...", compactCount(e.Prune.Before)), p.width))
+		p.line(renderPruner(fmt.Sprintf("checkpoint: choosing what stays (%s tokens)...", compactCount(e.Prune.Before)), p.width))
 
 	case axon.KindPruneEnd:
 		if e.Prune == nil {
 			return
 		}
-		p.line(renderPruner(fmt.Sprintf("context pruned · %s → %s tokens",
+		p.line(renderPruner(fmt.Sprintf("context %s → %s tokens",
 			compactCount(e.Prune.Before), compactCount(e.Prune.After)), p.width))
 
 	case axon.KindInfo:

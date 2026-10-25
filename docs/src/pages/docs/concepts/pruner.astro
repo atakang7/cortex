@@ -3,67 +3,53 @@ import Doc from '../../../layouts/Doc.astro';
 import Pager from '../../../components/Pager.astro';
 const slug = 'concepts/pruner';
 ---
-<Doc slug={slug} title="The pruner">
-  <h1>The pruner</h1>
-  <p class="lede">A cheap secondary model that parks stale context so the main model stays under its window.</p>
+<Doc slug={slug} title="Context: checkpoints and the explorer">
+  <h1>Context: checkpoints and the explorer</h1>
+  <p class="lede">Finish real work in a 20–30K token context, with one rule: cheap models read; the main model decides.</p>
 
-  <h2>The problem</h2>
+  <h2>Checkpoints</h2>
   <p>
-    As a session grows, the conversation approaches the model's context window. The naive fix —
-    dropping old messages — loses the thread. The pruner does something smarter: it runs a
-    separate, cheap model that <em>parks</em> stale context by summarising it, so the main model
-    keeps the thread without paying for every old token on every call.
+    The agent chooses what stays in its own context with the <code>checkpoint</code> tool: keep a
+    result whole, keep only some of its lines, or replace it with a one-line note. Everything
+    dropped stays in the session log and comes back with <code>recall</code>. The agent calls it
+    when a step is done, and the runtime asks for one when the context reaches the trigger
+    (axon's <code>pruner.mode</code>: low 48K, moderate 32K, extreme 20K tokens). Asked of the main
+    model, a checkpoint reuses the cached prompt, so it costs about one ordinary step. If the work
+    really needs more, the agent keeps it and the next checkpoint waits for growth beyond that.
   </p>
+  <pre><code># optional; omit to let the main model decide checkpoints
+pruner:
+  model: some/other-model
+  provider: openrouter   # defaults to the main provider if omitted</code></pre>
 
-  <h2>How it's configured</h2>
-  <p>The pruner is optional. When configured, it runs alongside the main model:</p>
-  <pre><code>pruner:
-  model: meta-llama/llama-3.1-8b   # a cheap, fast model
-  provider: openrouter             # defaults to the main provider if omitted</code></pre>
+  <h2>The explorer</h2>
   <p>
-    If <code>pruner.provider</code> is omitted, it falls back to the main provider. If
-    <code>pruner.model</code> is empty, no pruner runs — the main model manages its own window.
+    With <code>explorer.model</code> set, the agent gets an <code>explore</code> tool. It hands a broad
+    question to a cheaper model that may only read and search, in its own throw-away context. The
+    explorer reports facts with quotes; every quote is checked against the file, and only verified
+    facts reach the agent, labelled as the explorer's reading. The agent still reads raw whatever
+    it edits.
   </p>
+  <pre><code>explorer:
+  model: z-ai/glm-5.3-flash
+  provider: openrouter</code></pre>
 
-  <h2>What the pruner sees</h2>
+  <h2>Auditing</h2>
   <p>
-    The pruner's context decisions are as worth auditing as the agent's, and they are invisible in
-    the event stream — the stream only reports how many tokens a pass moved, never why. That's
-    why the pruner model is <strong>also tapped by the trace log</strong>, so you can read its
-    curator calls and understand what it decided to park and what it kept.
-  </p>
-
-  <div class="callout info">
-    <span class="ico">ℹ️</span>
-    <div class="callout-body">
-      <strong>Two models, one trace.</strong> Both the main model and the pruner are tapped at
-      the single place they are resolved. See
-      <a href="/cortex/docs/concepts/trace-log/">Trace log</a> for how to read what each one sent.
-    </div>
-  </div>
-
-  <h2>Persisting the pruner choice</h2>
-  <p>
-    When the pruner model is changed interactively, cortex saves the new provider and model to
-    your user config. The next session picks it up automatically.
+    Both side models are tapped into the <a href="/cortex/docs/concepts/trace-log/">trace log</a>
+    next to the main one, so you can read what a checkpoint kept and what the explorer read.
+    Choices made with <code>/pruner</code> and <code>/explorer</code>, or in the editor, are saved to
+    your user config.
   </p>
 
   <div class="callout info">
     <span class="ico">📖</span>
     <div class="callout-body">
-      <strong>The pruner is axon's.</strong> cortex only names <em>which</em> cheap model to run.
-      axon owns the context windowing, the curator calls and the parking strategy — see
-      <a href="https://atakang7.github.io/axon/runtime/context/">axon's context management</a> for
-      how it keeps long sessions stable. cortex taps the pruner model into the
-      <a href="/cortex/docs/concepts/trace-log/">trace log</a> so you can audit those decisions.
+      <strong>The mechanism is axon's.</strong> See axon's <code>WORKING_CONTEXT.md</code> for the
+      design and its guarantees. The free review pool (<code>pruner.models</code>) is retired; an old
+      config still loads and says so.
     </div>
   </div>
-
-  <h2>When not to use a pruner</h2>
-  <ul>
-    <li>For short sessions that never approach the window — the pruner only adds cost.</li>
-    <li>When you want the main model to see the full, unwindowed conversation — e.g. careful auditing.</li>
-  </ul>
 
   <div class="docs-pager"><Pager slug={slug} /></div>
 </Doc>

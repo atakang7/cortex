@@ -66,7 +66,7 @@ type acpServer struct {
 	cfg         config.Config
 	settings    axon.Settings
 	model       axon.Model
-	prunerModel axon.Model
+	side        sideModels
 	trace       *ui.TraceLog
 
 	writeMu   sync.Mutex
@@ -75,7 +75,7 @@ type acpServer struct {
 	nextID    atomic.Uint64
 }
 
-func runACP(cfg config.Config, settings axon.Settings, model axon.Model, prunerModel axon.Model, trace *ui.TraceLog) error {
+func runACP(cfg config.Config, settings axon.Settings, model axon.Model, side sideModels, trace *ui.TraceLog) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 	defer stop()
 
@@ -83,7 +83,7 @@ func runACP(cfg config.Config, settings axon.Settings, model axon.Model, prunerM
 		cfg:         cfg,
 		settings:    settings,
 		model:       model,
-		prunerModel: prunerModel,
+		side:        side,
 		trace:       trace,
 		sessions:    make(map[string]*acpSession),
 	}
@@ -166,7 +166,7 @@ func (s *acpServer) handle(ctx context.Context, req acpRequest) (any, *acpRPCErr
 		sid := fmt.Sprintf("cortex-%d", s.nextID.Add(1))
 		sess := &acpSession{}
 		emit := fanOut(s.eventSink(sid, sess), s.trace.Emit)
-		agent, err := newAgent(s.cfg, s.settings, s.model, s.prunerModel, emit, maxIterationsOnce)
+		agent, err := newAgent(s.cfg, s.settings, s.model, s.side, emit, maxIterationsOnce)
 		if err != nil {
 			return nil, internalError(err)
 		}

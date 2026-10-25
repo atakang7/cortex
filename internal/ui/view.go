@@ -73,7 +73,7 @@ func inputHeight(lines int) int {
 // box so it reads as a continuation of the transcript, and the status line
 // sits below so the box stays the visual centre.
 func (m Model) View() string {
-	if m.pickingModel || m.pickingPruner || m.pickingSession {
+	if m.picking() {
 		return m.picker.View()
 	}
 
@@ -139,9 +139,10 @@ func (m Model) statusLine() string {
 	facts := []string{styleStatus.Render(m.modelName)}
 
 	if m.prunerName != "" {
-		facts = append(facts, stylePruner.Render("pruner: "+m.prunerName))
-	} else {
-		facts = append(facts, styleStatus.Render("pruner: off"))
+		facts = append(facts, stylePruner.Render("checkpoint: "+m.prunerName))
+	}
+	if m.explorerName != "" {
+		facts = append(facts, stylePruner.Render("explorer: "+m.explorerName))
 	}
 
 	if cwd := cwdLabel(m.agent.Session().Cwd); cwd != "" {

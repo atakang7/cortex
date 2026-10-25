@@ -4,7 +4,7 @@
 
 **A terminal coding agent built on the [axon](https://github.com/atakang7/axon) runtime.**
 
-Streaming chat · tool dispatch · append-only sessions · secondary-LLM context pruning — all from your terminal.
+Streaming chat · tool dispatch · append-only sessions · checkpoints the agent decides · a read-only explorer — all from your terminal.
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/atakang7/cortex.svg)](https://pkg.go.dev/github.com/atakang7/cortex)
 [![CI](https://github.com/atakang7/cortex/actions/workflows/ci.yml/badge.svg)](https://github.com/atakang7/cortex/actions/workflows/ci.yml)
@@ -188,8 +188,11 @@ model: deepseek/deepseek-v3.2   # the model within that provider
 
 system_prompt: ./reviewer.md    # a path is read from disk; prose is used as written
 
-pruner:                         # optional secondary model for context pruning
-  model: meta-llama/llama-3.1-8b
+# pruner:                       # optional: who decides checkpoints; omit to let the main model decide
+#   model: some/other-model
+
+explorer:                       # optional: a cheaper, read-only model behind the explore tool
+  model: z-ai/glm-5.3-flash
   provider: openrouter          # defaults to the main provider if omitted
 
 mcp_servers:                    # spawned at startup, their tools auto-discovered
@@ -249,7 +252,7 @@ Each session opens with a banner showing the cortex version, the provider and mo
 
 ### Changing the model mid-session
 
-When the model is changed interactively, cortex persists the new provider and model to your user config. The same applies to the pruner. So the next session picks up where you left off.
+When the model is changed interactively, cortex persists the new provider and model to your user config. The same applies to the checkpoint model and the explorer. So the next session picks up where you left off.
 
 For the keys and commands available inside a session, see:
 - [Keyboard reference](#keyboard-reference)
@@ -302,7 +305,8 @@ Type a slash command at the prompt to control the session.
 | `/pwd` | Show the working directory. |
 | `/session` | Session file, turn count, pending undos. |
 | `/model` | Select a different model for this session. |
-| `/pruner` | Select a different pruner model for this session. |
+| `/pruner` | Choose the model that decides checkpoints (default: the main model). |
+| `/explorer` | Choose the cheaper, read-only model behind the explore tool, or none. |
 | `/switch` | Switch to a different saved session. |
 | `/help` | List the commands. |
 | `/quit` | Exit (`/exit`, `/q` also work). |
@@ -409,42 +413,25 @@ The tool catalog is appended by [axon](https://atakang7.github.io/axon/tools/bui
 
 ---
 
-## The pruner
+## Context: checkpoints and the explorer
 
-A cheap secondary model that parks stale context so the main model stays under its window.
+The goal is to finish real work in a 20–30K token context instead of hundreds of thousands, without a cheap model ever deciding anything. One rule: **cheap models read; the main model decides.**
 
-### The problem
+### Checkpoints
 
-As a session grows, the conversation approaches the model's context window. The naive fix — dropping old messages — loses the thread. The pruner does something smarter: it runs a separate, cheap model that *parks* stale context by summarising it, so the main model keeps the thread without paying for every old token on every call.
+The agent chooses what stays in its own context with the `checkpoint` tool: keep a result whole, keep only some of its lines, or replace it with a one-line note. Everything dropped stays in the session log and comes back with `recall`. The agent calls it when a step is done, and the runtime asks for one when the context reaches the trigger (`pruner.mode` in axon: low 48K, moderate 32K, extreme 20K). Asked of the main model, a checkpoint reuses the cached prompt, so it costs about one ordinary step. If the work really needs more, the agent keeps it and the next checkpoint waits for growth beyond that.
 
-### How it's configured
+`pruner.model` names a different model for this decision. Leave it empty to let the main model decide — the default.
 
-The pruner is optional. When configured, it runs alongside the main model:
+### The explorer
 
-```yaml
-pruner:
-  model: meta-llama/llama-3.1-8b   # a cheap, fast model
-  provider: openrouter             # defaults to the main provider if omitted
-```
+With `explorer.model` set, the agent gets an `explore` tool. It hands a broad question ("who calls `Refresh`, starting from `auth/`") to a cheaper model that may only read and search, in its own throw-away context. It reports facts with quotes; cortex checks every quote against the file and passes on only the verified ones, labelled as the explorer's reading. The agent still reads raw whatever it edits.
 
-If `pruner.provider` is omitted, it falls back to the main provider. If `pruner.model` is empty, no pruner runs — the main model manages its own window.
+### Auditing
 
-### What the pruner sees
+Both side models are tapped into the [trace log](#trace-log) next to the main one, so you can read what a checkpoint kept and what the explorer read.
 
-The pruner's context decisions are as worth auditing as the agent's, and they are invisible in the event stream — the stream only reports how many tokens a pass moved, never why. That's why the pruner model is **also tapped by the trace log**, so you can read its curator calls and understand what it decided to park and what it kept.
-
-> **ℹ️ Two models, one trace.** Both the main model and the pruner are tapped at the single place they are resolved. See [Trace log](#trace-log) for how to read what each one sent.
-
-### Persisting the pruner choice
-
-When the pruner model is changed interactively, cortex saves the new provider and model to your user config. The next session picks it up automatically.
-
-> **📖 The pruner is axon's.** cortex only names *which* cheap model to run. axon owns the context windowing, the curator calls and the parking strategy — see [axon's context management](https://atakang7.github.io/axon/concepts/context/) for how it keeps long sessions stable. cortex taps the pruner model into the [trace log](#trace-log) so you can audit those decisions.
-
-### When not to use a pruner
-
-- For short sessions that never approach the window — the pruner only adds cost.
-- When you want the main model to see the full, unwindowed conversation — e.g. careful auditing.
+> **📖 The mechanism is axon's.** See axon's `WORKING_CONTEXT.md` for the full design and its guarantees.
 
 ---
 
@@ -801,15 +788,24 @@ Every field in a cortex config file, what it means and what it overrides.
 | `provider` | string | The axon provider name (e.g. `openai`, `openrouter`). Supplies a default `base_url` for known providers. |
 | `model` | string | The model within that provider (e.g. `gpt-4o`, `deepseek/deepseek-v3.2`). |
 | `system_prompt` | string | The agent's role text. A path is read from disk; prose is used as written. Omit to use the built-in coding-agent prompt. **Must not enumerate tools** — axon appends the catalog. |
-| `pruner` | object | The secondary model for context pruning. See below. |
+| `pruner` | object | The model that decides checkpoints. Empty: the main model. See below. |
+| `explorer` | object | The read-only model behind the explore tool. Empty: no explore tool. See below. |
 | `mcp_servers` | map | MCP subprocesses to spawn at startup. See below. |
 
 ### `pruner`
 
 | Field | Type | Description |
 |---|---|---|
-| `pruner.provider` | string | Provider for the pruner model. Defaults to the main provider if omitted. |
-| `pruner.model` | string | The cheap, fast model used for context pruning. Empty means no pruner. |
+| `pruner.provider` | string | Provider for the checkpoint model. Defaults to the main provider if omitted. |
+| `pruner.model` | string | The model that decides what stays in context. Empty means the main model decides (recommended). |
+| `pruner.models` | list | Retired (the free review pool). Accepted and ignored, with a warning. |
+
+### `explorer`
+
+| Field | Type | Description |
+|---|---|---|
+| `explorer.provider` | string | Provider for the explorer model. Defaults to the main provider if omitted. |
+| `explorer.model` | string | A cheaper model that answers read-only questions with verified quotes. Empty means no explore tool. |
 
 ### `mcp_servers`
 

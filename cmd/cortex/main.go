@@ -106,11 +106,8 @@ func run() error {
 		return err
 	}
 
-	// A pruner is optional. When configured, it runs a cheap secondary model
-	// that parks stale context so the main model stays under its window.
-	if len(cfg.Pruner.Models) > 0 || cfg.Pruner.Model != "" {
-		settings.Pruner.Semantic = true
-		settings.Pruner.Categories = true
+	for _, w := range cfg.Warnings {
+		fmt.Fprintf(os.Stderr, "cortex: %s\n", w)
 	}
 
 	// The trace log is a third, unfiltered event sink alongside whichever
@@ -126,12 +123,11 @@ func run() error {
 	}
 
 	// Tapping the models here, at the one place they are resolved, is what
-	// puts the actual prompts in the trace. Both are tapped: the curator's
-	// context decisions are as worth auditing as the agent's, and they are
-	// invisible in the event stream, which only reports how many tokens a
-	// pass moved and never why.
+	// puts the actual prompts in the trace. The side models are tapped too:
+	// what a checkpoint kept and what the explorer read are as worth auditing
+	// as the agent's own requests.
 	model = trace.Wiretap("main", model)
-	prunerModel, err := resolvePruner(cfg, settings, trace)
+	side, err := resolveSideModels(cfg, settings, trace)
 	if err != nil {
 		return err
 	}
@@ -141,23 +137,25 @@ func run() error {
 		Version:        version,
 		Provider:       cfg.Provider,
 		Model:          cfg.ModelName,
-		PrunerProvider: cfg.Pruner.Provider,
-		PrunerModel:    cfg.Pruner.Model,
+		PrunerProvider:   cfg.Pruner.Provider,
+		PrunerModel:      cfg.Pruner.Model,
+		ExplorerProvider: cfg.Explorer.Provider,
+		ExplorerModel:    cfg.Explorer.Model,
 		Cwd:            cwd,
 	})
 
 	if *stdioMode {
-		return runEditorBridge(cfg, settings, model, prunerModel, trace)
+		return runEditorBridge(cfg, settings, model, side, trace)
 	}
 	if *acpMode {
-		return runACP(cfg, settings, model, prunerModel, trace)
+		return runACP(cfg, settings, model, side, trace)
 	}
 
 	if *prompt != "" {
-		return runOnce(cfg, settings, model, prunerModel, trace, *prompt)
+		return runOnce(cfg, settings, model, side, trace, *prompt)
 	}
 
-	return runInteractive(cfg, settings, model, prunerModel, trace)
+	return runInteractive(cfg, settings, model, side, trace)
 }
 
 // runInteractive starts the full terminal UI.
@@ -166,7 +164,7 @@ func run() error {
 // arrives as a key, and the UI binds it to cancelling the turn rather than
 // killing the process. Only a signal the terminal cannot deliver as a
 // keystroke should end the program from outside.
-func runInteractive(cfg config.Config, settings axon.Settings, model axon.Model, prunerModel axon.Model, trace *ui.TraceLog) error {
+func runInteractive(cfg config.Config, settings axon.Settings, model axon.Model, side sideModels, trace *ui.TraceLog) error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGHUP)
 	defer stop()
 
@@ -175,7 +173,7 @@ func runInteractive(cfg config.Config, settings axon.Settings, model axon.Model,
 	// Unbounded: a human is watching, and Ctrl-C ends a turn that has lost
 	// its way. See maxIterationsOnce for why -prompt is not given the same
 	// freedom.
-	agent, err := newAgent(cfg, settings, model, prunerModel, fanOut(bridge.Emit, trace.Emit), 0)
+	agent, err := newAgent(cfg, settings, model, side, fanOut(bridge.Emit, trace.Emit), 0)
 	if err != nil {
 		return err
 	}
@@ -185,12 +183,18 @@ func runInteractive(cfg config.Config, settings axon.Settings, model axon.Model,
 		Agent:      agent,
 		Context:    ctx,
 		ModelName:  cfg.ModelName,
-		PrunerName: cfg.Pruner.Model,
+		PrunerName:   cfg.Pruner.Model,
+		ExplorerName: cfg.Explorer.Model,
 		AgentName:  cfg.Name,
 		Settings:   settings,
 		OnPrunerChanged: func(provider, model string) {
 			if err := config.SavePruner(provider, model); err != nil {
 				fmt.Fprintf(os.Stderr, "cortex: could not save pruner: %v\n", err)
+			}
+		},
+		OnExplorerChanged: func(provider, model string) {
+			if err := config.SaveExplorer(provider, model); err != nil {
+				fmt.Fprintf(os.Stderr, "cortex: could not save explorer: %v\n", err)
 			}
 		},
 		OnModelChanged: func(provider, model string) {
@@ -203,14 +207,14 @@ func runInteractive(cfg config.Config, settings axon.Settings, model axon.Model,
 
 // runOnce drives a single turn with no TUI. Ctrl-C ends the process here,
 // which is the ordinary expectation for a one-shot command.
-func runOnce(cfg config.Config, settings axon.Settings, model axon.Model, prunerModel axon.Model, trace *ui.TraceLog, prompt string) error {
+func runOnce(cfg config.Config, settings axon.Settings, model axon.Model, side sideModels, trace *ui.TraceLog, prompt string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	renderer := ui.NewPlain(os.Stdout, os.Stderr)
 	defer renderer.Close()
 
-	agent, err := newAgent(cfg, settings, model, prunerModel, fanOut(renderer.Emit, trace.Emit), maxIterationsOnce)
+	agent, err := newAgent(cfg, settings, model, side, fanOut(renderer.Emit, trace.Emit), maxIterationsOnce)
 	if err != nil {
 		return err
 	}
@@ -256,7 +260,7 @@ const maxIterationsOnce = 120
 // newAgent constructs the runtime. Both modes go through here so they cannot
 // drift into configuring the agent differently; what legitimately differs
 // between them is passed in.
-func newAgent(cfg config.Config, settings axon.Settings, model axon.Model, prunerModel axon.Model, onEvent func(context.Context, axon.Event), maxIterations int) (*axon.Agent, error) {
+func newAgent(cfg config.Config, settings axon.Settings, model axon.Model, side sideModels, onEvent func(context.Context, axon.Event), maxIterations int) (*axon.Agent, error) {
 	if runtime.GOOS == "windows" {
 		// The exec tool prefers Git Bash and falls back to PowerShell; telling
 		// the model the wrong one made it write oracles that could not run.
@@ -273,7 +277,8 @@ func newAgent(cfg config.Config, settings axon.Settings, model axon.Model, prune
 		MCPServers:    servers,
 		OnEvent:       onEvent,
 		Settings:      settings,
-		Pruner:        prunerModel,
+		Pruner:        side.pruner,
+		Explorer:      side.explorer,
 		MaxIterations: maxIterations,
 		// The same model that answers turns also names them. A title request
 		// is one cheap, tool-free call on turn 1; a dedicated model is not
