@@ -512,3 +512,14 @@ func setMapField(m *yaml.Node, key, value string) {
 		&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: value},
 	)
 }
+
+// UserDir is cortex's per-user directory (the one holding config.yaml), or ""
+// when the platform has none. Model preferences and the catalog cache live
+// here so choosing a model never needs the config file.
+func UserDir() string {
+	dir := userConfigDir()
+	if dir == "" {
+		return ""
+	}
+	return filepath.Join(dir, "cortex")
+}

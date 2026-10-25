@@ -88,6 +88,19 @@ func run() error {
 		return err
 	}
 
+	// A model picked in the editor overrides the config's, and its provider
+	// route (manual, or the cheapest for a typical request) is applied.
+	prefs := loadModelPrefs()
+	if prefs.Model != "" {
+		if prefs.Provider != "" {
+			cfg.Provider = prefs.Provider
+		}
+		cfg.ModelName = prefs.Model
+	}
+	if route, _ := resolveRoute(context.Background(), settings, cfg.Provider, cfg.ModelName, prefs, profileOf(nil)); route != "" {
+		settings = settings.WithRoute(cfg.Provider, cfg.ModelName, route)
+	}
+
 	model, err := settings.NewFreeFirstClient(cfg.Provider, cfg.ModelName)
 	if err != nil {
 		return err

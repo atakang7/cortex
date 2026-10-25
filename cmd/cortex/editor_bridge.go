@@ -26,6 +26,12 @@ type editorBridge struct {
 	trace    *ui.TraceLog
 	busy     bool
 	cancel   context.CancelFunc
+	// prefs are the editor's model choices; route is the provider tag the
+	// current model is routed to ("" lets OpenRouter route).
+	prefs modelPrefs
+	route string
+	// reply is a command's payload, sent with its response.
+	reply any
 }
 type editorRequest struct {
 	ID       string `json:"id"`
@@ -35,6 +41,9 @@ type editorRequest struct {
 	Provider string `json:"provider"`
 	Model    string `json:"model"`
 	Mode     string `json:"mode"`
+	Query    string `json:"query"`
+	On       bool   `json:"on"`
+	Route    string `json:"route"`
 }
 
 func (b *editorBridge) write(v any) {
@@ -64,12 +73,17 @@ func (b *editorBridge) state() map[string]any {
 	for _, s := range axon.ListSessions(b.agent.SessionsDir(), b.agent.SessionPath()) {
 		sessions = append(sessions, map[string]any{"id": s.ID, "path": s.Path, "cwd": s.Cwd, "title": s.Title, "turn": s.Turn, "started_at": s.StartedAt, "current": s.Current})
 	}
-	return map[string]any{"provider": b.cfg.Provider, "model": b.cfg.ModelName, "pruner_provider": b.cfg.Pruner.Provider, "pruner_model": b.cfg.Pruner.Model, "pruner_models": b.cfg.Pruner.Models, "prune_mode": b.settings.Pruner.Mode, "providers": providers, "session": session, "session_items": sessions, "busy": b.busy, "usage": map[string]any{"prompt": s.PromptTokens, "completion": s.CompletionTokens, "cost": s.Cost}, "goal": s.ActiveGoalView()}
+	return map[string]any{"provider": b.cfg.Provider, "model": b.cfg.ModelName, "pruner_provider": b.cfg.Pruner.Provider, "pruner_model": b.cfg.Pruner.Model, "pruner_models": b.cfg.Pruner.Models, "prune_mode": b.settings.Pruner.Mode, "providers": providers, "session": session, "session_items": sessions, "busy": b.busy, "usage": map[string]any{"prompt": s.PromptTokens, "completion": s.CompletionTokens, "cost": s.Cost, "cached": s.CachedTokens, "requests": s.Requests}, "goal": s.ActiveGoalView(),
+		"favorites": b.prefs.Favorites, "route": b.route, "route_auto": b.prefs.Route == "" || b.prefs.Model != b.cfg.ModelName, "openrouter": isOpenRouterEndpoint(b.settings, b.cfg.Provider)}
 }
 func (b *editorBridge) respond(r editorRequest, err error) {
 	v := map[string]any{"type": "response", "id": r.ID, "ok": err == nil}
 	if err != nil {
 		v["error"] = err.Error()
+	}
+	if b.reply != nil {
+		v["data"] = b.reply
+		b.reply = nil
 	}
 	if !b.busy {
 		v["state"] = b.state()
@@ -77,7 +91,10 @@ func (b *editorBridge) respond(r editorRequest, err error) {
 	b.write(v)
 }
 func runEditorBridge(cfg config.Config, settings axon.Settings, model axon.Model, pruner axon.Model, trace *ui.TraceLog) error {
-	b := &editorBridge{cfg: cfg, settings: settings, trace: trace}
+	b := &editorBridge{cfg: cfg, settings: settings, trace: trace, prefs: loadModelPrefs()}
+	if e, ok := settings.Providers[cfg.Provider]; ok {
+		b.route = e.Models[cfg.ModelName].Route // applied at startup by run
+	}
 	var err error
 	b.agent, err = newAgent(cfg, settings, model, pruner, fanOut(b.emit, trace.Emit), maxIterationsOnce)
 	if err != nil {
@@ -176,33 +193,91 @@ func (b *editorBridge) command(r editorRequest) error {
 		b.agent.SetPruneMode(mode)
 		b.settings.Pruner.Mode = mode
 		return nil
-	case "select_model", "select_pruner":
-		var model axon.Model
-		var err error
-		if r.Type == "select_model" {
-			model, err = b.settings.NewFreeFirstClient(r.Provider, r.Model)
-		} else {
-			model, err = b.settings.NewPrunerClient(r.Provider, r.Model)
-		}
+	case "models":
+		models, err := loadCatalog(context.Background())
 		if err != nil {
 			return err
 		}
-		if r.Type == "select_model" {
-			if err := config.SaveModel(r.Provider, r.Model); err != nil {
-				return err
-			}
-			b.agent.SetModel(b.trace.Wiretap("main", model))
-			b.cfg.Provider = r.Provider
-			b.cfg.ModelName = r.Model
-		} else {
-			if err := config.SavePruner(r.Provider, r.Model); err != nil {
-				return err
-			}
-			b.agent.SetPrunerModel(b.trace.Wiretap("pruner", model))
-			b.cfg.Pruner = config.PrunerRef{Provider: r.Provider, Model: r.Model}
+		b.reply = map[string]any{"models": searchCatalog(models, r.Query, b.prefs.Favorites, 60), "favorites": favoriteModels(models, b.prefs.Favorites)}
+		return nil
+	case "favorite":
+		b.prefs.setFavorite(r.Model, r.On)
+		return saveModelPrefs(b.prefs)
+	case "endpoints":
+		model := r.Model
+		if model == "" {
+			model = b.cfg.ModelName
 		}
+		eps, err := fetchEndpoints(context.Background(), model)
+		if err != nil {
+			return err
+		}
+		u := profileOf(b.agent.Session())
+		auto := ""
+		if i := rankEndpoints(eps, u); i >= 0 {
+			auto = eps[i].Tag
+		}
+		b.reply = map[string]any{"model": model, "endpoints": eps, "auto": auto, "route": b.route,
+			"profile": map[string]float64{"input": u.Input, "output": u.Output, "hit_rate": u.HitRate}}
+		return nil
+	case "select_route":
+		b.prefs.Provider, b.prefs.Model, b.prefs.Route = b.cfg.Provider, b.cfg.ModelName, r.Route
+		if err := saveModelPrefs(b.prefs); err != nil {
+			return err
+		}
+		return b.useModel(b.cfg.Provider, b.cfg.ModelName)
+	case "select_model", "select_pruner":
+		if r.Type == "select_model" {
+			// A newly picked model starts on automatic provider choice.
+			b.prefs.Provider, b.prefs.Model, b.prefs.Route = r.Provider, r.Model, ""
+			if err := saveModelPrefs(b.prefs); err != nil {
+				return err
+			}
+			return b.useModel(r.Provider, r.Model)
+		}
+		model, err := b.settings.NewPrunerClient(r.Provider, r.Model)
+		if err != nil {
+			return err
+		}
+		if err := config.SavePruner(r.Provider, r.Model); err != nil {
+			return err
+		}
+		b.agent.SetPrunerModel(b.trace.Wiretap("pruner", model))
+		b.cfg.Pruner = config.PrunerRef{Provider: r.Provider, Model: r.Model}
 		return nil
 	default:
 		return fmt.Errorf("Unknown editor command %q", r.Type)
 	}
+}
+
+// useModel switches the agent to provider/model, routed to the user's chosen
+// provider or the cheapest one for this session's usage.
+func (b *editorBridge) useModel(provider, model string) error {
+	route, _ := resolveRoute(context.Background(), b.settings, provider, model, b.prefs, profileOf(b.agent.Session()))
+	settings := b.settings.WithRoute(provider, model, route)
+	client, err := settings.NewFreeFirstClient(provider, model)
+	if err != nil {
+		return err
+	}
+	b.agent.SetModel(b.trace.Wiretap("main", client))
+	b.settings, b.route = settings, route
+	b.cfg.Provider, b.cfg.ModelName = provider, model
+	return nil
+}
+
+// favoriteModels returns the catalog entries of the favourites, in their order.
+func favoriteModels(models []catalogModel, favorites []string) []catalogModel {
+	byID := map[string]catalogModel{}
+	for _, m := range models {
+		byID[m.ID] = m
+	}
+	var out []catalogModel
+	for _, id := range favorites {
+		if m, ok := byID[id]; ok {
+			out = append(out, m)
+		} else {
+			out = append(out, catalogModel{ID: id, Name: id})
+		}
+	}
+	return out
 }
