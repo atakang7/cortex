@@ -89,3 +89,25 @@ func TestFreeModelsAreListedAndFilterable(t *testing.T) {
 		t.Fatalf("pruner list should include tool-less free models: %v", f)
 	}
 }
+
+func TestRouterModelsWithVariablePricingAreNeverFree(t *testing.T) {
+	router := catalogModel{ID: "typesafe/jev-router", Name: "Jev Router", Tools: true, Variable: rawPricing{Prompt: "-1", Completion: "-1"}.variable()}
+	free := catalogModel{ID: "openrouter/free", Name: "Free Router", Tools: true}
+	exact := catalogModel{ID: "z/coder:free", Name: "Z Coder", Tools: true}
+	models := []catalogModel{router, free, exact}
+	if isFree(router) {
+		t.Fatal("a variable-priced router bills the model it routes to")
+	}
+	got := searchCatalog(models, "", nil, 1000, true)
+	if len(got) != 2 || got[0].ID == router.ID || got[1].ID == router.ID {
+		t.Fatalf("free filter %v", got)
+	}
+	if f := freeModels(models); len(f) != 2 {
+		t.Fatalf("pruner list must not offer the router: %v", f)
+	}
+	eps := []modelEndpoint{{Tag: "unknown", Variable: true, Tools: true, Context: 200000, Uptime: 100},
+		{Tag: "priced", Prompt: 1e-6, Completion: 2e-6, Tools: true, Context: 200000, Uptime: 100}}
+	if i := rankEndpoints(eps, usageProfile{Input: 1000, Output: 100}); eps[i].Tag != "priced" {
+		t.Fatalf("auto route picked %s; unknown pricing must not rank as zero", eps[i].Tag)
+	}
+}

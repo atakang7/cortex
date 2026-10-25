@@ -94,6 +94,9 @@ type catalogModel struct {
 	Completion float64 `json:"completion"`
 	CacheRead  float64 `json:"cache_read"`
 	Tools      bool    `json:"tools"`
+	// Variable marks router models (openrouter/auto, …) priced "-1": they
+	// bill whatever model they route to, so they are never free.
+	Variable bool `json:"variable,omitempty"`
 }
 
 type rawPricing struct {
@@ -104,10 +107,17 @@ type rawPricing struct {
 
 func price(s string) float64 {
 	f, _ := strconv.ParseFloat(s, 64)
-	if f < 0 { // OpenRouter uses -1 for "variable" router pricing
+	if f < 0 { // OpenRouter uses -1 for "variable" router pricing; see variable
 		return 0
 	}
 	return f
+}
+
+// variable reports router pricing: the cost is the routed model's, unknown here.
+func (p rawPricing) variable() bool {
+	in, _ := strconv.ParseFloat(p.Prompt, 64)
+	out, _ := strconv.ParseFloat(p.Completion, 64)
+	return in < 0 || out < 0
 }
 
 func hasTools(params []string) bool {
@@ -125,7 +135,7 @@ func hasTools(params []string) bool {
 func loadCatalog(ctx context.Context) ([]catalogModel, error) {
 	cache := ""
 	if dir := config.UserDir(); dir != "" {
-		cache = filepath.Join(dir, "catalog.json")
+		cache = filepath.Join(dir, "catalog-v2.json") // v1 recorded router prices as zero
 	}
 	var cached struct {
 		Fetched time.Time      `json:"fetched"`
@@ -169,7 +179,8 @@ func fetchCatalog(ctx context.Context) ([]catalogModel, error) {
 	out := make([]catalogModel, 0, len(body.Data))
 	for _, m := range body.Data {
 		out = append(out, catalogModel{ID: m.ID, Name: m.Name, Context: m.ContextLength,
-			Prompt: price(m.Pricing.Prompt), Completion: price(m.Pricing.Completion), CacheRead: price(m.Pricing.InputCacheRead), Tools: hasTools(m.Params)})
+			Prompt: price(m.Pricing.Prompt), Completion: price(m.Pricing.Completion), CacheRead: price(m.Pricing.InputCacheRead), Tools: hasTools(m.Params),
+			Variable: m.Pricing.variable()})
 	}
 	return out, nil
 }
@@ -193,9 +204,9 @@ func getJSON(ctx context.Context, url string, timeout time.Duration, into any) e
 }
 
 // isFree reports a model OpenRouter serves at no charge (":free" variants and
-// zero-priced models).
+// zero-priced models). Routers with variable pricing bill the model they pick.
 func isFree(m catalogModel) bool {
-	return strings.HasSuffix(m.ID, ":free") || (m.Prompt == 0 && m.Completion == 0)
+	return !m.Variable && (strings.HasSuffix(m.ID, ":free") || (m.Prompt == 0 && m.Completion == 0))
 }
 
 // freeModels are every free model, tools or not: the pruner only needs JSON.
@@ -263,6 +274,7 @@ type modelEndpoint struct {
 	Uptime     float64 `json:"uptime"`
 	Status     int     `json:"status"`
 	Quant      string  `json:"quantization,omitempty"`
+	Variable   bool    `json:"variable,omitempty"`
 	Eligible   bool    `json:"eligible"`
 	CostPerReq float64 `json:"cost_per_request"`
 }
@@ -290,7 +302,7 @@ func fetchEndpoints(ctx context.Context, model string) ([]modelEndpoint, error) 
 	for _, e := range body.Data.Endpoints {
 		ep := modelEndpoint{Provider: e.ProviderName, Tag: e.Tag, Context: e.Context, Prompt: price(e.Pricing.Prompt),
 			Completion: price(e.Pricing.Completion), CacheRead: price(e.Pricing.InputCacheRead), Tools: hasTools(e.Params),
-			Status: e.Status, Quant: e.Quantization, Uptime: -1}
+			Status: e.Status, Quant: e.Quantization, Uptime: -1, Variable: e.Pricing.variable()}
 		ep.Caching = e.Implicit || ep.CacheRead > 0
 		if e.Uptime30m != nil {
 			ep.Uptime = *e.Uptime30m
@@ -346,7 +358,8 @@ func rankEndpoints(eps []modelEndpoint, u usageProfile) int {
 	for i := range eps {
 		e := &eps[i]
 		e.CostPerReq = costPerRequest(*e, u)
-		e.Eligible = e.Tools && e.Context >= minEndpointContext && e.Status >= 0 && (e.Uptime < 0 || e.Uptime >= 90)
+		// An unknown price cannot be ranked, and must never look like zero.
+		e.Eligible = !e.Variable && e.Tools && e.Context >= minEndpointContext && e.Status >= 0 && (e.Uptime < 0 || e.Uptime >= 90)
 		if !e.Eligible {
 			continue
 		}
