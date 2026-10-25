@@ -247,7 +247,7 @@ func newAgent(cfg config.Config, settings axon.Settings, model axon.Model, prune
 	if runtime.GOOS == "windows" {
 		// The exec tool prefers Git Bash and falls back to PowerShell; telling
 		// the model the wrong one made it write oracles that could not run.
-		cfg.SystemPrompt += "\n\nThis host is Windows. The exec tool runs commands in " + axon.ShellName() + "; write commands, and oracles, in that syntax. Background commands use the same shell."
+		cfg.SystemPrompt += "\n\nThis host is Windows. The exec tool runs commands in " + axon.ShellName() + "; write commands, and oracles, in that syntax. Background commands use the same shell. The read and write tools accept both C:\\Users\\... and /c/Users/... paths."
 	}
 	servers := make([]axon.MCPServer, 0, len(cfg.MCPServers))
 	for _, s := range cfg.MCPServers {
