@@ -12,8 +12,9 @@ import (
 // without a pruner the main model decides checkpoints, which is the default,
 // and without an explorer there is no explore tool.
 type sideModels struct {
-	pruner   axon.Model
-	explorer axon.Model
+	pruner axon.Model
+	// explorers are tried in turn: the configured explorer, then the pool.
+	explorers []axon.Model
 }
 
 // resolveSideModels builds the configured side models. Either may use any
@@ -29,11 +30,13 @@ func resolveSideModels(cfg config.Config, s axon.Settings, trace *ui.TraceLog) (
 		out.pruner = trace.Wiretap("pruner", m)
 	}
 	if cfg.Explorer.Model != "" {
-		m, err := s.NewClient(orProvider(cfg.Explorer.Provider, cfg.Provider), cfg.Explorer.Model)
-		if err != nil {
-			return out, fmt.Errorf("explorer: %w", err)
+		for _, id := range append([]string{cfg.Explorer.Model}, cfg.Explorer.Models...) {
+			m, err := s.NewClient(orProvider(cfg.Explorer.Provider, cfg.Provider), id)
+			if err != nil {
+				return out, fmt.Errorf("explorer %s: %w", id, err)
+			}
+			out.explorers = append(out.explorers, trace.Wiretap("explorer", m))
 		}
-		out.explorer = trace.Wiretap("explorer", m)
 	}
 	return out, nil
 }

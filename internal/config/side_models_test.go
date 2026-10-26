@@ -23,13 +23,13 @@ func TestRetiredPrunerPoolLoadsAndIsReported(t *testing.T) {
 }
 
 func TestExplorerAndPrunerLayerLikeTheModel(t *testing.T) {
-	f := file{Provider: "openrouter", Model: "main", Explorer: modelFile{Model: "cheap"}}
-	overlay(&f, file{Pruner: prunerFile{Model: "judge"}, Explorer: modelFile{Provider: "local", Model: "cheaper"}})
+	f := file{Provider: "openrouter", Model: "main", Explorer: explorerFile{Model: "cheap"}}
+	overlay(&f, file{Pruner: prunerFile{Model: "judge"}, Explorer: explorerFile{Provider: "local", Model: "cheaper"}})
 	cfg, err := finalize(f, "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Pruner.Model != "judge" || cfg.Explorer != (ExplorerRef{Provider: "local", Model: "cheaper"}) {
+	if cfg.Pruner.Model != "judge" || cfg.Explorer.Provider != "local" || cfg.Explorer.Model != "cheaper" {
 		t.Fatalf("pruner %+v explorer %+v", cfg.Pruner, cfg.Explorer)
 	}
 }
@@ -69,5 +69,24 @@ func TestSaveSideModelsSetAndClear(t *testing.T) {
 	data, _ := os.ReadFile(path)
 	if !strings.Contains(string(data), "# mine") || strings.Contains(string(data), "a:free") {
 		t.Fatalf("config rewritten badly:\n%s", data)
+	}
+}
+
+func TestExplorerPoolLoadsAndSurvivesSavingTheExplorer(t *testing.T) {
+	userDir, _ := workspace(t)
+	path := filepath.Join(userDir, "cortex", "config.yaml")
+	write(t, path, "provider: openrouter\nmodel: main\nexplorer:\n  model: free/a\n  models: [free/b, free/a, free/c, free/b]\n")
+	cfg, err := Load("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Explorer.Model != "free/a" || strings.Join(cfg.Explorer.Models, ",") != "free/b,free/c" {
+		t.Fatalf("explorer %+v", cfg.Explorer)
+	}
+	if err := SaveExplorer("openrouter", "free/c"); err != nil {
+		t.Fatal(err)
+	}
+	if cfg, _ = Load(""); cfg.Explorer.Model != "free/c" || len(cfg.Explorer.Models) == 0 {
+		t.Fatalf("saving the explorer dropped the pool: %+v", cfg.Explorer)
 	}
 }

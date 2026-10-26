@@ -278,7 +278,7 @@ func newAgent(cfg config.Config, settings axon.Settings, model axon.Model, side 
 		OnEvent:       onEvent,
 		Settings:      settings,
 		Pruner:        side.pruner,
-		Explorer:      side.explorer,
+		Explorers:     side.explorers,
 		MaxIterations: maxIterations,
 		// The same model that answers turns also names them. A title request
 		// is one cheap, tool-free call on turn 1; a dedicated model is not

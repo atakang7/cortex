@@ -76,7 +76,7 @@ func (b *editorBridge) state() map[string]any {
 	}
 	// An empty pruner_model means the main model decides checkpoints; an
 	// empty explorer_model means no explore tool.
-	return map[string]any{"provider": b.cfg.Provider, "model": b.cfg.ModelName, "pruner_provider": b.cfg.Pruner.Provider, "pruner_model": b.cfg.Pruner.Model, "explorer_provider": b.cfg.Explorer.Provider, "explorer_model": b.cfg.Explorer.Model,
+	return map[string]any{"provider": b.cfg.Provider, "model": b.cfg.ModelName, "pruner_provider": b.cfg.Pruner.Provider, "pruner_model": b.cfg.Pruner.Model, "explorer_provider": b.cfg.Explorer.Provider, "explorer_model": b.cfg.Explorer.Model, "explorer_models": b.cfg.Explorer.Models,
 		"prune_mode": b.settings.Pruner.Mode, "checkpoint_tokens": b.settings.Pruner.Trigger(), "checkpoints": len(s.Checkpoints),
 		"providers": providers, "session": session, "session_items": sessions, "busy": b.busy, "usage": map[string]any{"prompt": s.PromptTokens, "completion": s.CompletionTokens, "cost": s.Cost, "cached": s.CachedTokens, "requests": s.Requests, "explorer": s.ExplorerTokens}, "goal": s.ActiveGoalView(),
 		"favorites": b.prefs.Favorites, "route": b.route, "route_auto": b.prefs.Route == "" || b.prefs.Model != b.cfg.ModelName, "openrouter": isOpenRouterEndpoint(b.settings, b.cfg.Provider)}
@@ -259,16 +259,30 @@ func (b *editorBridge) command(r editorRequest) error {
 		b.cfg.Pruner = config.PrunerRef{Provider: r.Provider, Model: r.Model}
 		return nil
 	case "select_explorer":
+		// The chosen model leads the pool; the configured pool follows it.
 		// An empty model turns the explore tool off.
-		model, err := b.sideModel("explorer", r)
-		if err != nil {
-			return err
+		ref := config.ExplorerRef{Provider: r.Provider, Model: r.Model}
+		var pool []axon.Model
+		if r.Model != "" {
+			for _, id := range append([]string{r.Model}, b.cfg.Explorer.Models...) {
+				if id == r.Model && len(pool) > 0 {
+					continue
+				}
+				m, err := b.sideModel("explorer", editorRequest{Provider: r.Provider, Model: id})
+				if err != nil {
+					return err
+				}
+				pool = append(pool, m)
+				if id != r.Model {
+					ref.Models = append(ref.Models, id)
+				}
+			}
 		}
 		if err := config.SaveExplorer(r.Provider, r.Model); err != nil {
 			return err
 		}
-		b.agent.SetExplorerModel(model)
-		b.cfg.Explorer = config.ExplorerRef{Provider: r.Provider, Model: r.Model}
+		b.agent.SetExplorerModels(pool...)
+		b.cfg.Explorer = ref
 		return nil
 	default:
 		return fmt.Errorf("Unknown editor command %q", r.Type)

@@ -78,11 +78,12 @@ type PrunerRef struct {
 	Model    string
 }
 
-// ExplorerRef points at the explore tool's model. An empty Model means no
-// explore tool.
+// ExplorerRef points at the explore tool's models: Model first, then Models
+// in turn when one fails. An empty Model means no explore tool.
 type ExplorerRef struct {
 	Provider string
 	Model    string
+	Models   []string
 }
 
 // ErrNoModel means neither a config file nor the environment named a model.
@@ -102,7 +103,7 @@ type file struct {
 	Model        string            `yaml:"model"`
 	SystemPrompt string            `yaml:"system_prompt"`
 	Pruner       prunerFile        `yaml:"pruner"`
-	Explorer     modelFile         `yaml:"explorer"`
+	Explorer     explorerFile      `yaml:"explorer"`
 	MCPServers   map[string]mcpSrv `yaml:"mcp_servers"`
 }
 
@@ -120,9 +121,11 @@ type prunerFile struct {
 	Models []string `yaml:"models,omitempty"`
 }
 
-type modelFile struct {
+type explorerFile struct {
 	Provider string `yaml:"provider"`
 	Model    string `yaml:"model"`
+	// Models are more explorers, tried after Model in turn.
+	Models []string `yaml:"models,omitempty"`
 }
 
 // ---------------------------------------------------------------------------
@@ -235,6 +238,9 @@ func overlay(dst *file, src file) {
 	}
 	setString(&dst.Explorer.Provider, src.Explorer.Provider)
 	setString(&dst.Explorer.Model, src.Explorer.Model)
+	if src.Explorer.Models != nil {
+		dst.Explorer.Models = append([]string{}, src.Explorer.Models...)
+	}
 
 	if len(src.MCPServers) > 0 {
 		if dst.MCPServers == nil {
@@ -289,6 +295,13 @@ func finalize(f file, source string) (Config, error) {
 
 	cfg.Pruner = PrunerRef{Provider: f.Pruner.Provider, Model: f.Pruner.Model}
 	cfg.Explorer = ExplorerRef{Provider: f.Explorer.Provider, Model: f.Explorer.Model}
+	seen := map[string]bool{f.Explorer.Model: true}
+	for _, m := range f.Explorer.Models {
+		if m = strings.TrimSpace(m); m != "" && !seen[m] {
+			seen[m] = true
+			cfg.Explorer.Models = append(cfg.Explorer.Models, m)
+		}
+	}
 	if len(f.Pruner.Models) > 0 {
 		cfg.Warnings = append(cfg.Warnings, "pruner.models, the free review pool, is retired and ignored: a cheap model no longer decides what leaves the context. Checkpoints are decided by "+orMain(cfg.Pruner.Model)+". Remove pruner.models from your config.")
 	}
@@ -433,7 +446,10 @@ func saveRoleModel(key, provider, model string) error {
 
 	m := rootMapping(&root)
 	node := findOrCreateMap(m, key)
-	deleteMapField(node, "models")
+	if key == "pruner" {
+		// The retired free review pool goes with any new choice.
+		deleteMapField(node, "models")
+	}
 	if model == "" {
 		deleteMapField(node, "provider")
 		deleteMapField(node, "model")
