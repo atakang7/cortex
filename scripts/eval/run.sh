@@ -35,6 +35,7 @@ set +e
 code=$?
 set -e
 secs=$(( $(date +%s) - start ))
+echo "$secs" > "$run/seconds"
 
 verdict=$(bash "$tdir/check.sh" "$run/repo" "$tdir/fixture" 2>&1 | tail -5 | tr '\n' ' ')
 
