@@ -376,10 +376,10 @@ func TestSummarizeArgsPicksTheSubject(t *testing.T) {
 		args string
 		want string
 	}{
-		{"read", `{"path":"internal/ui/view.go","mode":"full"}`, "internal/ui/view.go  full"},
-		{"exec", `{"command":"go test ./...","timeout":60}`, "go test ./..."},
-		{"search", `{"pattern":"TODO","mode":"regex"}`, "TODO  regex"},
-		{"task", `{"goal":"add a health endpoint"}`, "add a health endpoint"},
+		{"read_file", `{"path":"internal/ui/view.go"}`, "internal/ui/view.go"},
+		{"edit", `{"path":"a.go","old_string":"x","new_string":"y"}`, "a.go"},
+		{"bash", `{"command":"go test ./...","timeout":60}`, "go test ./..."},
+		{"grep", `{"pattern":"TODO","glob":"*.go"}`, "TODO"},
 
 		// An unknown tool — every MCP tool is one — falls back to the shared
 		// key list rather than dumping JSON.

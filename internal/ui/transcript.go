@@ -220,11 +220,12 @@ func (c toolCard) footer() string {
 // A tool not listed here falls back to the first key it does have from the
 // shared list below, then to compact JSON.
 var argSubjects = map[string][]string{
-	"read":        {"path"},
-	"write":       {"path"},
-	"search":      {"pattern", "query"},
-	"exec":        {"command"},
-	"task":        {"goal"},
+	"read_file":   {"path"},
+	"edit":        {"path"},
+	"write_file":  {"path"},
+	"grep":        {"pattern"},
+	"glob":        {"pattern"},
+	"bash":        {"command"},
 	"bash_output": {"shell_id", "id"},
 	"kill_shell":  {"shell_id", "id"},
 }

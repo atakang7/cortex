@@ -275,6 +275,9 @@ type modelEndpoint struct {
 	Status     int     `json:"status"`
 	Quant      string  `json:"quantization,omitempty"`
 	Variable   bool    `json:"variable,omitempty"`
+	// Speed is the provider's p90 throughput over the last 30 minutes, in
+	// tokens per second; 0 when OpenRouter has no figure.
+	Speed      float64 `json:"speed,omitempty"`
 	Eligible   bool    `json:"eligible"`
 	CostPerReq float64 `json:"cost_per_request"`
 }
@@ -292,6 +295,9 @@ func fetchEndpoints(ctx context.Context, model string) ([]modelEndpoint, error) 
 				Uptime30m    *float64   `json:"uptime_last_30m"`
 				Implicit     bool       `json:"supports_implicit_caching"`
 				Quantization string     `json:"quantization"`
+				Throughput   *struct {
+					P90 float64 `json:"p90"`
+				} `json:"throughput_last_30m"`
 			} `json:"endpoints"`
 		} `json:"data"`
 	}
@@ -306,6 +312,9 @@ func fetchEndpoints(ctx context.Context, model string) ([]modelEndpoint, error) 
 		ep.Caching = e.Implicit || ep.CacheRead > 0
 		if e.Uptime30m != nil {
 			ep.Uptime = *e.Uptime30m
+		}
+		if e.Throughput != nil {
+			ep.Speed = e.Throughput.P90
 		}
 		if ep.Tag == "" {
 			ep.Tag = strings.ToLower(ep.Provider)
@@ -326,7 +335,8 @@ type usageProfile struct {
 // short reply.
 func profileOf(s *axon.Session) usageProfile {
 	if s == nil || s.Requests == 0 || s.PromptTokens == 0 {
-		return usageProfile{Input: 30000, Output: 1500, HitRate: 0.6}
+		// Agent sessions measured 74-84% cache hits (eval, 2026-10-28).
+		return usageProfile{Input: 30000, Output: 1500, HitRate: 0.8}
 	}
 	n := float64(s.Requests)
 	return usageProfile{Input: float64(s.PromptTokens) / n, Output: float64(s.CompletionTokens) / n,
@@ -354,13 +364,35 @@ func costPerRequest(e modelEndpoint, u usageProfile) float64 {
 // cheapest eligible endpoint (tools, context for the budget, up), or -1.
 // Ties go to the higher uptime.
 func rankEndpoints(eps []modelEndpoint, u usageProfile) int {
-	best := -1
+	fastest := 0.0
 	for i := range eps {
 		e := &eps[i]
 		e.CostPerReq = costPerRequest(*e, u)
 		// An unknown price cannot be ranked, and must never look like zero.
 		e.Eligible = !e.Variable && e.Tools && e.Context >= minEndpointContext && e.Status >= 0 && (e.Uptime < 0 || e.Uptime >= 90)
-		if !e.Eligible {
+		if e.Eligible && e.Speed > fastest {
+			fastest = e.Speed
+		}
+	}
+	// The route is chosen once per session and kept, so the provider's cache
+	// keeps serving the growing prefix. When a fast endpoint caches, one that
+	// does not is never chosen: it would pay the whole context every request.
+	cachingFast := false
+	for _, e := range eps {
+		if u.HitRate > 0 && e.Eligible && e.Caching && (fastest == 0 || e.Speed >= fastest*minSpeedShare) {
+			cachingFast = true
+		}
+	}
+	// Cheapest among the fast: the cheapest endpoint alone was often the
+	// slowest. An agent waits on every reply, and a reply's tail speed sets
+	// how long a turn takes: on 2026-10-28 MiMo's cheapest provider ran at
+	// 13 tokens/s at p90 against 24 for the fastest, and GLM 5.3 Flash's at
+	// 23 against 71. Endpoints within minSpeedShare of the fastest p90
+	// compete on price; without speed figures, price alone decides.
+	best := -1
+	for i := range eps {
+		e := &eps[i]
+		if !e.Eligible || (fastest > 0 && e.Speed < fastest*minSpeedShare) || (cachingFast && !e.Caching) {
 			continue
 		}
 		if best < 0 || e.CostPerReq < eps[best].CostPerReq || (e.CostPerReq == eps[best].CostPerReq && e.Uptime > eps[best].Uptime) {
@@ -369,6 +401,10 @@ func rankEndpoints(eps []modelEndpoint, u usageProfile) int {
 	}
 	return best
 }
+
+// minSpeedShare is how close to the fastest endpoint's p90 throughput an
+// endpoint must be to be chosen by price.
+const minSpeedShare = 0.6
 
 // resolveRoute returns the provider tag to route model to: the user's
 // manual choice, or the cheapest eligible endpoint for profile. "" means let
