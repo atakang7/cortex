@@ -29,6 +29,15 @@ model: $model
 EOF
 
 export AXON_DATA_DIR="$run/data"
+# EVAL_AXON_YAML is axon settings for this run only (e.g. a reasoning effort).
+if [ -n "${EVAL_AXON_YAML:-}" ]; then
+	mkdir -p "$run/xdg/axon"
+	# The user's own settings (providers) and credentials, plus the override.
+	base=${XDG_CONFIG_HOME:-$HOME/.config}/axon
+	{ cat "$base/axon.yaml" 2>/dev/null; printf '%s\n' "$EVAL_AXON_YAML"; } > "$run/xdg/axon/axon.yaml"
+	[ -f "$base/.env" ] && ln -sf "$base/.env" "$run/xdg/axon/.env"
+	export XDG_CONFIG_HOME="$run/xdg"
+fi
 start=$(date +%s)
 set +e
 (cd "$run/repo" && timeout 1800 "$bin" -config "$run/config.yaml" -prompt "$(cat "$tdir/prompt.md")") > "$run/transcript.txt" 2>&1
