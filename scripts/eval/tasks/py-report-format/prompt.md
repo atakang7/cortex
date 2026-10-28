@@ -1,0 +1,1 @@
+Add a --format option to the reportgen CLI: "text" (the default, today's output, unchanged) or "json", which prints the same report as JSON with sorted keys and an indent of 2. Cover the new option with tests in the existing test suite.
