@@ -19,7 +19,13 @@ import (
 	"github.com/atakang7/cortex/v2/internal/ui"
 )
 
-// ACP uses JSON-RPC over stdio; axon retains session and tool ownership.
+// Cortex speaks the stable ACP v1 subset Setpoint and editors need directly
+// over stdio. The protocol is deliberately a thin transport around axon: axon
+// still owns the session, tool loop, persistence and model streaming.
+//
+// Keeping this adapter here avoids making ACP part of axon's core contract
+// before the integration has proven itself. Once it has, this file can move
+// behind an axon transport package without changing the wire protocol.
 
 type acpRequest struct {
 	JSONRPC string          `json:"jsonrpc"`

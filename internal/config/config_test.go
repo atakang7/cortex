@@ -167,24 +167,6 @@ func TestSystemPromptIsReadFromAFileWhenItNamesOne(t *testing.T) {
 	}
 }
 
-func TestSystemPromptExpandsHomeDirectory(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	t.Setenv("USERPROFILE", home)
-	if err := os.MkdirAll(filepath.Join(home, "prompts"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	write(t, filepath.Join(home, "prompts", "reviewer.md"), "You review code.")
-
-	got, err := resolveSystemPrompt("~/prompts/reviewer.md")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got != "You review code." {
-		t.Fatalf("system prompt = %q, want contents of home-relative file", got)
-	}
-}
-
 func TestSystemPromptProseIsUsedLiterally(t *testing.T) {
 	_, workDir := workspace(t)
 

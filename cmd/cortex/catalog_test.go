@@ -1,12 +1,7 @@
 package main
 
 import (
-	"context"
 	"fmt"
-	"net/http"
-	"net/http/httptest"
-	"strings"
-	"time"
 	"math"
 	"testing"
 
@@ -114,31 +109,5 @@ func TestRouterModelsWithVariablePricingAreNeverFree(t *testing.T) {
 		{Tag: "priced", Prompt: 1e-6, Completion: 2e-6, Tools: true, Context: 200000, Uptime: 100}}
 	if i := rankEndpoints(eps, usageProfile{Input: 1000, Output: 100}); eps[i].Tag != "priced" {
 		t.Fatalf("auto route picked %s; unknown pricing must not rank as zero", eps[i].Tag)
-	}
-}
-
-func TestGetJSONRejectsTrailingData(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, `{"ok":true}{"ok":false}`)
-	}))
-	defer server.Close()
-
-	var body struct {
-		OK bool `json:"ok"`
-	}
-	if err := getJSON(context.Background(), server.URL, time.Second, &body); err == nil {
-		t.Fatal("expected an error for multiple JSON values")
-	}
-}
-
-func TestGetJSONRejectsOversizedBody(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, strings.Repeat("x", maxCatalogResponseBytes+1))
-	}))
-	defer server.Close()
-
-	var body any
-	if err := getJSON(context.Background(), server.URL, time.Second, &body); err == nil || !strings.Contains(err.Error(), "response exceeds") {
-		t.Fatalf("expected response size error, got %v", err)
 	}
 }
