@@ -347,6 +347,14 @@ func resolveSystemPrompt(v string) (string, error) {
 		return v, nil
 	}
 
+	if strings.HasPrefix(v, "~/") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("config: resolve home directory: %w", err)
+		}
+		v = filepath.Join(home, v[2:])
+	}
+
 	data, err := os.ReadFile(v)
 	if err != nil {
 		return "", fmt.Errorf("config: read system_prompt %s: %w", v, err)
