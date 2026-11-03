@@ -1,88 +1,37 @@
 # Contributing
 
-Thanks for considering a contribution to cortex.
+Cortex uses Go 1.26.2 and the [Axon runtime](https://github.com/atakang7/axon).
 
-## Getting started
-
-### Prerequisites
-
-- Go 1.26.2 or later
-- Git
-
-### Setup
+## Build and test
 
 ```sh
-git clone https://github.com/atakang7/cortex
-cd cortex
 go build ./...
+go vet ./...
+go test ./...
 ```
 
-The repo currently ships without tests. New behavior changes should land with tests.
+The docs site uses Node 24.
 
-## Philosophy
-
-cortex is intentionally thin. The runtime ([axon](https://github.com/atakang7/axon)) does the heavy lifting; cortex supplies a coding-agent personality and a terminal wrapper. Before adding anything, ask:
-
-- Does this belong in the runtime instead?
-- Can the user (or the agent) do it themselves?
-- Does it serve the "terminal coding agent" core experience?
-
-If the answer to the first is "yes," open a PR against axon, not cortex.
-
-## Commit messages
-
-cortex uses [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/). The release pipeline derives the next semver from these prefixes; commitlint enforces the format on every pull request.
-
-**Format**
-
-```
-<type>(<optional scope>): <short imperative subject>
-
-<optional body>
-
-<optional footer(s), including BREAKING CHANGE>
+```sh
+cd docs
+npm ci
+npm run build
 ```
 
-**Types and release impact**
+## Changes
 
-| Type       | Purpose                                     | Release bump |
-| ---------- | ------------------------------------------- | ------------ |
-| `feat`     | New user-facing feature                     | **minor**    |
-| `fix`      | Bug fix                                     | **patch**    |
-| `perf`     | Performance improvement, no behavior change | **patch**    |
-| `refactor` | Internal restructure, no behavior change    | **patch**    |
-| `docs`     | Documentation only                          | **patch**    |
-| `build`    | Build system, `go.mod`, release tooling     | **patch**    |
-| `test`     | Adding or fixing tests                      | none         |
-| `ci`       | CI configuration                            | none         |
-| `chore`    | Maintenance not covered above               | none         |
-| `style`    | Formatting, whitespace                      | none         |
-| `revert`   | Reverts a previous commit                   | varies       |
+The CLI is in [cmd/cortex](cmd/cortex/README.md), config resolution in [internal/config](internal/config/README.md), and terminal rendering in [internal/ui](internal/ui/README.md).
 
-Breaking changes force a **major** bump regardless of type. Mark with `!` after the type or with a `BREAKING CHANGE:` footer:
+Add a regression test for changed behavior. Keep runtime changes in Axon if they apply to other Axon clients.
 
-```
-feat!: drop LLM_LEGACY_KEY env var
+## Commits and releases
 
-BREAKING CHANGE: cortex now requires LLM_API_KEY. Set it before upgrading.
-```
+Use [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) with lowercase imperative subjects.
 
-Subjects are lowercase, imperative, ≤ 100 chars.
+`feat` publishes a minor release; `fix`, `docs`, `perf`, `refactor`, and `build` publish patches. `ci`, `test`, `chore`, and `style` do not publish releases.
 
-## Releases
+The release workflow runs semantic-release on `main` and GoReleaser builds Linux, macOS, and Windows binaries.
 
-Fully automated. Every push to `main` runs [semantic-release](https://semantic-release.gitbook.io/) which computes the next semver, updates the GitHub Release, tags it, and triggers [goreleaser](https://goreleaser.com/) to cross-compile `cmd/cortex` for linux/darwin × amd64/arm64.
+## Review
 
-No manual `git tag` step. Merge a `feat:` commit to ship a feature; merge a `fix:` to ship a fix. Use `chore:` / `ci:` / `test:` / `style:` for commits that should not release.
-
-Configuration:
-
-- `.releaserc.json` — semantic-release rules
-- `.goreleaser.yaml` — binary build matrix
-- `.commitlintrc.json` — accepted commit types
-- `.github/workflows/release.yml` — pipeline
-
-## Questions?
-
-- Open an issue.
-- Keep discussions focused.
+Open a pull request with the affected paths and the commands used to verify the change.
