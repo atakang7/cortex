@@ -5,3 +5,15 @@
 .DS_Store
 /playground/
 benchmarks/polyglot/.env
+
+# Local configuration and build output
+.env
+.env.*
+!.env.example
+*.py[cod]
+__pycache__/
+.venv/
+/cortex.exe
+/docs/node_modules/
+/docs/dist/
+/logs/
