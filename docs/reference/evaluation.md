@@ -7,7 +7,7 @@
 | path | purpose |
 | --- | --- |
 | `tasks/<task>/prompt.md` | Prompt passed to `cortex -prompt` |
-| `tasks/<task>/fixture/` | Repository copied into a new git worktree |
+| `tasks/<task>/fixture/` | Repository copied into a new git repository |
 | `tasks/<task>/check.sh` | Oracle called with the run repo and original fixture |
 
 ## Run files
