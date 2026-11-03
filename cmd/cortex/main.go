@@ -1,4 +1,13 @@
-// Command cortex runs the terminal coding agent backed by axon.
+// Command cortex is a terminal coding agent built on the axon runtime.
+//
+// axon owns the loop: streaming the model, dispatching tools, persisting an
+// append-only session, and pruning context under pressure. cortex owns the
+// product around it — resolving which model to talk to, the role text that
+// makes it a coding agent, and the terminal it talks through.
+//
+// This file is wiring and nothing else. Every decision it makes is delegated:
+// configuration to internal/config, presentation to internal/ui, and the loop
+// itself to axon. If logic accumulates here, it belongs in one of those.
 package main
 
 import (
@@ -67,6 +76,9 @@ func run() error {
 		return err
 	}
 
+	// axon owns providers, credentials and every runtime knob. cortex's
+	// config says which provider and model to use; axon's says where they
+	// live and how they are authenticated.
 	settings, err := axon.Load()
 	if err != nil {
 		if errors.Is(err, axon.ErrMissingConfig) || errors.Is(err, axon.ErrMissingEnv) {
@@ -110,7 +122,10 @@ func run() error {
 		fmt.Fprintf(os.Stderr, "cortex: trace: %s\n", path)
 	}
 
-	// Record requests from the main and side models.
+	// Tapping the models here, at the one place they are resolved, is what
+	// puts the actual prompts in the trace. The side models are tapped too:
+	// what a checkpoint kept and what the explorer read are as worth auditing
+	// as the agent's own requests.
 	model = trace.Wiretap("main", model)
 	side, err := resolveSideModels(cfg, settings, trace)
 	if err != nil {
@@ -227,9 +242,24 @@ func fanOut(sinks ...func(context.Context, axon.Event)) func(context.Context, ax
 	}
 }
 
-// maxIterationsOnce caps unattended turns that keep calling tools.
+// maxIterationsOnce bounds how many model calls a single non-interactive run
+// may make.
+//
+// Interactive sessions are deliberately unbounded: a human is watching and
+// Ctrl-C ends a turn that has lost its way. -prompt has neither. Without a
+// bound, a model that keeps calling tools and never answers spends the user's
+// budget until something else kills the process, which is the failure mode
+// axon.Config.MaxIterations exists to prevent and which every unattended
+// embedder is told to guard against.
+//
+// The number is chosen to be far above any real task — traced runs of a
+// multi-file feature settle around a dozen calls — so reaching it means the
+// loop is stuck, not that the work was large.
 const maxIterationsOnce = 120
 
+// newAgent constructs the runtime. Both modes go through here so they cannot
+// drift into configuring the agent differently; what legitimately differs
+// between them is passed in.
 func newAgent(cfg config.Config, settings axon.Settings, model axon.Model, side sideModels, onEvent func(context.Context, axon.Event), maxIterations int) (*axon.Agent, error) {
 	if runtime.GOOS == "windows" {
 		// The exec tool prefers Git Bash and falls back to PowerShell; telling
