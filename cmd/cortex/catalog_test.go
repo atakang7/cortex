@@ -123,7 +123,9 @@ func TestGetJSONRejectsTrailingData(t *testing.T) {
 	}))
 	defer server.Close()
 
-	var body struct { OK bool `json:"ok"` }
+	var body struct {
+		OK bool `json:"ok"`
+	}
 	if err := getJSON(context.Background(), server.URL, time.Second, &body); err == nil {
 		t.Fatal("expected an error for multiple JSON values")
 	}

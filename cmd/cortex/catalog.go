@@ -17,10 +17,7 @@ import (
 	"github.com/atakang7/cortex/v2/internal/config"
 )
 
-// The model catalog: OpenRouter lists every model and, per model, every
-// provider endpoint with its prices. Cortex picks from that directly, so the
-// config no longer has to name models. Choices (favourites, the selected
-// model, the provider route) live in models.json next to config.yaml.
+// OpenRouter catalog data is cached locally; model choices live in models.json.
 
 const (
 	openRouterAPI   = "https://openrouter.ai/api/v1"

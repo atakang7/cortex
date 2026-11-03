@@ -1,16 +1,4 @@
-// Package config resolves the one thing cortex must decide before it can
-// start: which model to talk to, with what role text, and which MCP servers
-// to spawn.
-//
-// axon owns the runtime — providers, credentials, tool caps, retry policy.
-// cortex owns the product — which of those providers to use, the role text
-// that makes it a coding agent, and the terminal it talks through.
-//
-// This package is where that boundary is drawn. It reads cortex's own config,
-// then hands the provider and model name to the caller so they can resolve it
-// against axon's Settings.
-//
-// BOUNDARY RULE: config is a leaf. It imports nothing else from this module.
+// Package config loads model selection and cortex-specific settings.
 package config
 
 import (
