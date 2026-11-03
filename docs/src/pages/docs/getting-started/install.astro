@@ -5,77 +5,24 @@ const slug = 'getting-started/install';
 ---
 <Doc slug={slug} title="Install">
   <h1>Install</h1>
-  <p class="lede">Linux, macOS, and Windows via WSL2. Intel and ARM are supported.</p>
-
-  <h2>Support matrix</h2>
-  <table>
-    <thead><tr><th>System</th><th>amd64 / Intel</th><th>arm64 / Apple Silicon</th><th>Recommended path</th></tr></thead>
-    <tbody>
-      <tr><td>Linux</td><td>✓</td><td>✓</td><td>release installer</td></tr>
-      <tr><td>macOS</td><td>✓</td><td>✓</td><td>release installer</td></tr>
-      <tr><td>Windows 10/11</td><td>✓ via WSL2</td><td>✓ via WSL2</td><td>WSL2 + Linux installer</td></tr>
-      <tr><td>Native Windows</td><td>—</td><td>—</td><td>not currently supported</td></tr>
-    </tbody>
-  </table>
-  <p>
-    Native Windows is intentionally not advertised as supported: Cortex/Axon currently rely on POSIX shell
-    execution and process-group semantics. WSL2 provides the supported Linux environment on Windows.
-  </p>
-
-  <h2>Linux and macOS <span class="badge">recommended</span></h2>
-  <p>The installer detects Linux vs macOS and Intel/AMD64 vs ARM64, installs without root to <code>~/.local/bin</code>, and verifies the binary.</p>
-  <pre><code>{`curl -fsSL https://raw.githubusercontent.com/atakang7/cortex/main/scripts/install.sh | sh`}</code></pre>
-  <p>Choose another user-owned directory without editing the script:</p>
-  <pre><code>{`curl -fsSL https://raw.githubusercontent.com/atakang7/cortex/main/scripts/install.sh | CORTEX_INSTALL_DIR="$HOME/bin" sh`}</code></pre>
-
-  <h2>Windows 10/11</h2>
-  <p>Install WSL2 once from an Administrator PowerShell terminal:</p>
-  <pre><code>wsl --install</code></pre>
-  <p>Restart if Windows asks, open the installed Linux distribution, then use the same supported installer:</p>
-  <pre><code>{`curl -fsSL https://raw.githubusercontent.com/atakang7/cortex/main/scripts/install.sh | sh`}</code></pre>
-  <p>Run Cortex from the WSL terminal. Your Windows drives are available under <code>/mnt/c</code>, <code>/mnt/d</code>, and so on.</p>
-
-  <h2>Manual release install</h2>
-  <p>For users who do not want to pipe an installer into a shell:</p>
-  <pre><code>{`OS=$(uname -s | tr '[:upper:]' '[:lower:]')
-ARCH=$(uname -m)
-case "$ARCH" in x86_64|amd64) ARCH=amd64 ;; arm64|aarch64) ARCH=arm64 ;; *) echo "unsupported architecture: $ARCH"; exit 1 ;; esac
-mkdir -p "$HOME/.local/bin"
-curl -fL "https://github.com/atakang7/cortex/releases/latest/download/cortex-\${OS}-\${ARCH}.tar.gz" -o /tmp/cortex.tar.gz
-tar -xzf /tmp/cortex.tar.gz -C "$HOME/.local/bin" cortex
-chmod 755 "$HOME/.local/bin/cortex"
-"$HOME/.local/bin/cortex" --version`}</code></pre>
+  <p>cortex needs Go 1.26.2 or newer to build from source. Release archives cover Linux and macOS on amd64 and arm64, plus native Windows on amd64.</p>
 
   <h2>Build from source</h2>
-  <p>This works on supported POSIX systems when Go and Git are installed:</p>
-  <pre><code>{`git clone https://github.com/atakang7/cortex.git
+  <pre><code>git clone https://github.com/atakang7/cortex.git
 cd cortex
 go build -o cortex ./cmd/cortex
-./cortex --version`}</code></pre>
+./cortex --version</code></pre>
+  <p>In Windows PowerShell, use <code>go build -o cortex.exe ./cmd/cortex</code>. The native Windows build uses Git Bash when available and PowerShell otherwise.</p>
 
-  <h2>About <code>go install</code></h2>
-  <p>
-    Do not use <code>go install github.com/atakang7/cortex/cmd/cortex@latest</code> for Cortex 2.x.
-    The repository's historical module path does not carry the <code>/v2</code> suffix required by
-    Go's semantic import versioning, so <code>@latest</code> can resolve the old v1 line. The release installer
-    above is the version-safe installation path.
-  </p>
+  <h2>Go install</h2>
+  <pre><code>go install github.com/atakang7/cortex/v2/cmd/cortex@latest</code></pre>
+  <p>Ensure your Go binary directory is on <code>PATH</code>.</p>
 
-  <h2>PATH troubleshooting</h2>
-  <p>If installation succeeds but your shell says <code>cortex: command not found</code>, add the user binary directory to PATH:</p>
-  <pre><code>{`export PATH="$HOME/.local/bin:$PATH"`}</code></pre>
-  <p>Put that line in <code>~/.zshrc</code> (common on macOS) or <code>~/.bashrc</code>/<code>~/.profile</code> (common on Linux/WSL) to keep it across terminals.</p>
-
-  <h2>Verify</h2>
-  <pre><code>cortex --version</code></pre>
-
-  <div class="callout info">
-    <span class="ico">ℹ️</span>
-    <div class="callout-body">
-      <strong>What's next?</strong> Cortex needs a model before it can start. Continue to
-      <a href="/cortex/docs/getting-started/quick-start/">Quick start</a>.
-    </div>
-  </div>
+  <h2>Release binaries</h2>
+  <p>Get the matching archive from <a href="https://github.com/atakang7/cortex/releases">GitHub Releases</a>. Linux and macOS users can run the checked-in installer, which installs to <code>~/.local/bin</code> by default:</p>
+  <pre><code>curl -fsSLO https://raw.githubusercontent.com/atakang7/cortex/main/scripts/install.sh
+sh install.sh</code></pre>
+  <p>Set <code>CORTEX_INSTALL_DIR</code> to choose a different location. On Windows, use the native source build or the Windows release ZIP.</p>
 
   <div class="docs-pager"><Pager slug={slug} /></div>
 </Doc>
