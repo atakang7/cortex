@@ -31,7 +31,7 @@ trap 'rm -rf "$tmp"' EXIT HUP INT TERM
 
 mkdir -p "$install_dir"
 echo "cortex: downloading latest ${os}/${arch} release..."
-curl -fL --retry 3 --retry-delay 1 "$url" -o "$tmp/cortex.tar.gz"
+curl -fL --connect-timeout 10 --max-time 120 --retry 3 --retry-delay 1 "$url" -o "$tmp/cortex.tar.gz"
 tar -xzf "$tmp/cortex.tar.gz" -C "$tmp" cortex
 install -m 0755 "$tmp/cortex" "$install_dir/cortex"
 
