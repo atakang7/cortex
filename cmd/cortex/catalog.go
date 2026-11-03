@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -26,6 +27,7 @@ const (
 	catalogTTL      = 6 * time.Hour
 	catalogTimeout  = 15 * time.Second
 	endpointTimeout = 8 * time.Second
+	maxCatalogResponseBytes = 8 << 20
 	// minEndpointContext keeps endpoints that fit the agent's 70K input
 	// budget plus a long reply.
 	minEndpointContext = 100000
@@ -200,7 +202,17 @@ func getJSON(ctx context.Context, url string, timeout time.Duration, into any) e
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("%s: %s", url, resp.Status)
 	}
-	return json.NewDecoder(resp.Body).Decode(into)
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxCatalogResponseBytes+1))
+	if err != nil {
+		return fmt.Errorf("%s: read response: %w", url, err)
+	}
+	if len(data) > maxCatalogResponseBytes {
+		return fmt.Errorf("%s: response exceeds %d bytes", url, maxCatalogResponseBytes)
+	}
+	if err := json.Unmarshal(data, into); err != nil {
+		return fmt.Errorf("%s: decode response: %w", url, err)
+	}
+	return nil
 }
 
 // isFree reports a model OpenRouter serves at no charge (":free" variants and
