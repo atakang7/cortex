@@ -28,12 +28,9 @@ export const nav = [
     ],
   },
   {
-    label: 'Playground',
+    label: 'Evaluation',
     pages: [
-      { slug: 'playground/overview', title: 'Overview' },
-      { slug: 'playground/running-tasks', title: 'Running tasks' },
-      { slug: 'playground/reading-traces', title: 'Reading traces' },
-      { slug: 'playground/tasks', title: 'Tasks reference' },
+      { slug: 'playground/overview', title: 'Evaluation harness' },
     ],
   },
   {

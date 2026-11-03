@@ -1,20 +1,35 @@
-# Eval
+Part of [cortex](../../README.md).
 
-Fixed tasks with oracles, so a change to the harness or the prompt is judged
-by what it does to real work: did the task pass, how long did it take, how many
-requests, how much of the prompt hit the cache, what did it cost.
+# scripts/eval
 
-    scripts/eval/run.sh path/to/cortex TASK MODEL OUT_DIR [LABEL]
+Runs coding tasks against fresh fixture repositories and grades results with task oracles.
 
-prints one JSON line. Each task is a directory under `tasks/`:
+## Run
 
-- `prompt.md`: the user message, sent once with `-prompt`.
-- `fixture/`: the repository, copied into a fresh git repo for every run.
-- `check.sh REPO FIXTURE`: the oracle; prints PASS or FAIL with the reason.
+```sh
+scripts/eval/run.sh "$PWD/cortex" go-pricing "<openrouter-model>" "$PWD/eval-runs"
+scripts/eval/grade.sh "$PWD/eval-runs"
+```
 
-Compare two builds by running both on the same tasks and model. Put the
-toolchains the tasks need (Go, Python) on PATH. On Windows keep OUT_DIR short
-(git fails on long paths).
+Build `cortex` first; choose a configured OpenRouter model.
 
-Add a task for every turn that went wrong in a real session: the fixture is
-the smallest repository that reproduces it, the oracle what the user wanted.
+## Test
+
+```sh
+bash -n scripts/eval/run.sh scripts/eval/grade.sh
+```
+
+## Config
+
+| var | default | what |
+| --- | --- | --- |
+| `EVAL_AXON_YAML` | unset | Extra Axon YAML applied to a run |
+| `AXON_DATA_DIR` | per-run directory | Session storage set by `run.sh` |
+
+## Interfaces
+
+`run.sh` takes `CORTEX_BIN TASK MODEL OUT_DIR [LABEL]` and prints one JSON metrics line.
+
+Each task reads `prompt.md`, copies `fixture/`, and runs `check.sh`. Output includes a session directory, `transcript.txt`, and `seconds`.
+
+See [evaluation reference](../../docs/reference/evaluation.md) for the task contract.

@@ -5,3 +5,12 @@
 .DS_Store
 /playground/
 benchmarks/polyglot/.env
+
+# Python evaluation fixtures
+__pycache__/
+*.pyc
+
+# Local credentials
+.env
+.env.*
+!.env.example
