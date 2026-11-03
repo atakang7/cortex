@@ -1,0 +1,181 @@
+---
+title: Lightning Quickstart
+description: From zero to a working Cortex session in about a minute.
+---
+
+import { Steps, Aside, Tabs, TabItem, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+<div class="quick-hero">
+  <span class="quick-kicker">ZERO → FIRST TURN</span>
+  <h1>Get Cortex working in about a minute.</h1>
+  <p>Install the binary, point Axon at a provider, choose a model, then run Cortex inside any repository.</p>
+</div>
+
+<Steps>
+
+1. **Install Cortex**
+
+   <Tabs>
+     <TabItem label="Go install">
+
+   ```sh
+   go install github.com/atakang7/cortex/cmd/cortex@latest
+   ```
+
+     </TabItem>
+     <TabItem label="Release binary">
+
+   Download the latest Linux/macOS amd64/arm64 build from [GitHub Releases](https://github.com/atakang7/cortex/releases/latest).
+
+     </TabItem>
+   </Tabs>
+
+2. **Configure one provider in Axon**
+
+   Axon owns provider endpoints, credentials, retries, tool limits, sessions, and runtime policy.
+
+   ```sh
+   mkdir -p ~/.config/axon
+   ```
+
+   Create `~/.config/axon/axon.yaml`:
+
+   ```yaml
+   providers:
+     openrouter:
+       base_url: https://openrouter.ai/api
+       api_key: ${OPENROUTER_API_KEY}
+       models:
+         z-ai/glm-5.2:
+         deepseek/deepseek-v3.2:
+   ```
+
+   Create `~/.config/axon/.env`:
+
+   ```dotenv
+   OPENROUTER_API_KEY=sk-or-...
+   ```
+
+   ```sh
+   chmod 600 ~/.config/axon/.env
+   ```
+
+3. **Tell Cortex which model to use**
+
+   ```sh
+   mkdir -p ~/.config/cortex
+   ```
+
+   Create `~/.config/cortex/config.yaml`:
+
+   ```yaml
+   provider: openrouter
+   model: z-ai/glm-5.2
+   ```
+
+4. **Run it in a repository**
+
+   ```sh
+   cd ~/code/my-project
+   cortex
+   ```
+
+   Then ask for an actual change:
+
+   ```text
+   ❯ find the failing test, fix the bug, and verify the fix
+   ```
+
+</Steps>
+
+<div class="success-box">
+  <span>THAT'S IT</span>
+  <strong>Cortex is now operating on the real repository with Axon driving the tool/model loop underneath.</strong>
+</div>
+
+## Three things worth knowing immediately
+
+<CardGrid>
+  <LinkCard title="Undo any managed edit" description="Type /undo and Cortex restores the previous bytes exactly." href="https://github.com/atakang7/cortex" />
+  <LinkCard title="Switch models live" description="Type /model or /pruner without restarting the session." href="https://github.com/atakang7/cortex" />
+  <LinkCard title="Automate it" description="Use cortex --prompt and pipe the final answer from stdout." href="https://github.com/atakang7/cortex" />
+</CardGrid>
+
+## Optional: add a cheap context pruner
+
+Long coding sessions can accumulate a lot of tool output. Give Cortex a cheaper secondary model that Axon can use to park stale context:
+
+```yaml
+# ~/.config/cortex/config.yaml
+provider: openrouter
+model: z-ai/glm-5.2
+
+pruner:
+  provider: openrouter
+  model: deepseek/deepseek-v4-flash-0731
+```
+
+<Aside type="note" title="The history is not deleted">
+Axon's pruning changes the model-facing projection. The durable session history stays intact.
+</Aside>
+
+## Optional: project-specific model
+
+Keep your global defaults and override only what a repository needs:
+
+```yaml
+# ./cortex.yaml
+model: deepseek/deepseek-v3.2
+```
+
+Cortex layers user config → project config → `LLM_PROVIDER` / `LLM_MODEL` environment overrides.
+
+## One-shot mode
+
+```sh
+cortex --prompt "summarize the API changes since HEAD~5"
+```
+
+The contract is deliberately Unix-like:
+
+```text
+stdout  final assistant answer
+stderr  tool activity, notices, errors, trace path
+```
+
+So this works cleanly:
+
+```sh
+cortex --prompt "find every TODO and group them by package" > todos.md
+```
+
+## Local models
+
+Any OpenAI-compatible provider configured in Axon can work. For example:
+
+```yaml
+# ~/.config/axon/axon.yaml
+providers:
+  ollama:
+    base_url: http://localhost:11434
+    models:
+      qwen2.5-coder:7b:
+```
+
+```yaml
+# ~/.config/cortex/config.yaml
+provider: ollama
+model: qwen2.5-coder:7b
+```
+
+No API key is required for a local endpoint.
+
+## Next
+
+Run Cortex first. Learn the rest only when you need it.
+
+- `/help` — commands
+- `/session` — session state
+- `/model` — active model
+- `/pruner` — context curator
+- [Axon docs](https://atakang7.github.io/axon/) — runtime settings, providers, tools, context, retries, MCP

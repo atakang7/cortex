@@ -1,0 +1,64 @@
+---
+import Doc from '../../../layouts/Doc.astro';
+import Pager from '../../../components/Pager.astro';
+const slug = 'playground/reading-traces';
+---
+<Doc slug={slug} title="Reading traces">
+  <h1>Reading traces</h1>
+  <p class="lede"><code>trace.sh</code> reads a cortex trace. Six views, each one <code>jq</code> filter.</p>
+
+  <pre><code>./trace.sh &lt;view&gt; &lt;trace.jsonl&gt; [arg]</code></pre>
+
+  <h2>Views</h2>
+
+  <h3><code>timeline</code></h3>
+  <p>
+    One line per thing that happened, with just enough payload to see the shape of a run. Streaming
+    token noise is dropped — it's the same text the <code>assistant_end</code> line carries in full.
+    Great for getting the overall shape of a run at a glance.
+  </p>
+  <pre><code>./trace.sh timeline runs/report-final/trace.jsonl</code></pre>
+
+  <h3><code>prompt</code></h3>
+  <p>
+    Every message of one model call, exactly as the provider saw it. Defaults to the last main-model
+    request; pass a call number for a specific one, or <code>pruner</code> for the curator's last.
+  </p>
+  <pre><code>./trace.sh prompt runs/report-final/trace.jsonl          # last main call
+./trace.sh prompt runs/report-final/trace.jsonl 3        # call #3
+./trace.sh prompt runs/report-final/trace.jsonl pruner   # the pruner's last call</code></pre>
+
+  <h3><code>system</code></h3>
+  <p>
+    The system message alone — the prompt under test, plus whatever axon appends (including the
+    tool catalog). This is the view for prompt engineering: it shows the composed system prompt the
+    model actually received.
+  </p>
+  <pre><code>./trace.sh system runs/report-final/trace.jsonl</code></pre>
+
+  <h3><code>tools</code></h3>
+  <p>
+    What the agent actually did, in order, with full arguments and a clipped result. This is the view
+    that shows a wrong approach fastest.
+  </p>
+  <pre><code>./trace.sh tools runs/report-final/trace.jsonl</code></pre>
+
+  <h3><code>usage</code></h3>
+  <p>Token spend per call and in total. Reported by the provider, not estimated.</p>
+  <pre><code>./trace.sh usage runs/report-final/trace.jsonl</code></pre>
+
+  <h3><code>errors</code></h3>
+  <p>Every error, tool error and wire error, with timestamps.</p>
+  <pre><code>./trace.sh errors runs/report-final/trace.jsonl</code></pre>
+
+  <div class="callout tip">
+    <span class="ico">💡</span>
+    <div class="callout-body">
+      <strong>The pattern worth keeping:</strong> when the agent misbehaves, read <code>tools</code>
+      first to see what it did, then <code>prompt</code> to see what it was told. The cause is almost
+      always something it was told, and usually somewhere more structural than the role prompt.
+    </div>
+  </div>
+
+  <div class="docs-pager"><Pager slug={slug} /></div>
+</Doc>

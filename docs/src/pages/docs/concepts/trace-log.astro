@@ -5,12 +5,85 @@ const slug = 'concepts/trace-log';
 ---
 <Doc slug={slug} title="Trace log">
   <h1>Trace log</h1>
-  <p class="lede">Cortex records Axon events and the exact model requests and replies in JSONL.</p>
-  <h2>Event and wire records</h2>
-  <p>Runtime events record tool calls and usage. <code>wire_request</code> and <code>wire_reply</code> record the model traffic that produced them.</p>
-  <h2>Storage</h2>
-  <p>Files are written below the platform's user cache directory in <code>cortex/trace/</code>. Cortex prints the path on stderr at startup.</p>
-  <h2>Failure behavior</h2>
-  <p>If the trace file cannot be opened, Cortex logs the error and continues the run. A write failure is ignored by the trace sink.</p>
+  <p class="lede">A third, unfiltered event sink — wire-level request and reply logging.</p>
+
+  <!-- Three sinks diagram -->
+  <div class="sinks-diagram">
+    <div class="sink-source">
+      <div class="sink-tag">the loop</div>
+      <div class="sink-box">axon runtime</div>
+      <div class="sink-sub">streaming · tools · pruner</div>
+    </div>
+    <div class="sink-fan">
+      <div class="sink-arrow">↓</div>
+      <div class="sink-label">every request &amp; reply</div>
+    </div>
+    <div class="sink-rows">
+      <div class="sink-card sink-ui">
+        <div class="sink-name">the TUI</div>
+        <div class="sink-desc">what the user sees — the rendered transcript</div>
+      </div>
+      <div class="sink-card sink-plain">
+        <div class="sink-name">the plain renderer</div>
+        <div class="sink-desc">stdout for the answer, stderr for everything else</div>
+      </div>
+      <div class="sink-card sink-trace accent">
+        <div class="sink-name">the trace log</div>
+        <div class="sink-desc">the wire — exactly what each model saw &amp; said</div>
+      </div>
+    </div>
+    <div class="sink-note">
+      Both the main model and the pruner are tapped at the one place they are resolved — so the
+      trace holds the actual prompts, not just the rendered replies.
+    </div>
+  </div>
+
+  <h2>Where it lives</h2>
+  <p>
+    The trace log is written to <code>DefaultTracePath()</code>, a path under your cache directory.
+    At startup cortex prints the path to stderr:
+  </p>
+  <pre><code>cortex: trace: /home/you/.cache/cortex/trace-20250101-120000.jsonl</code></pre>
+
+  <h2>It never fails the run</h2>
+  <p>
+    A broken cache directory means no trace, not no cortex. If the trace log can't be opened, cortex
+    prints a notice to stderr and continues without it:
+  </p>
+  <pre><code>cortex: trace log disabled: &lt;error&gt;</code></pre>
+
+  <h2>Both models are tapped</h2>
+  <p>
+    The pruner's context decisions are as worth auditing as the agent's, and they are invisible in
+    the event stream — the stream only reports how many tokens a pass moved, never why. Tapping both
+    models at the one place they are resolved is what puts those decisions in the trace, so you can
+    read what the pruner decided to park and what it kept.
+  </p>
+
+  <h2>Run metadata</h2>
+  <p>
+    The trace opens with a <code>Describe</code> block recording the cortex version, the provider
+    and model for both the main agent and the pruner, and the working directory. This anchors every
+    trace to the exact configuration that produced it.
+  </p>
+
+  <h2>Why it exists</h2>
+  <p>
+    The trace log is the tool you reach for when the agent did something surprising and you want to
+    know <em>why</em> — what prompt the model actually received, what context the pruner had
+    decided to park, what the model said before the UI rendered it. It's prompt-engineering against
+    reality, not against the abstraction.
+  </p>
+
+  <div class="callout info">
+    <span class="ico">📖</span>
+    <div class="callout-body">
+      <strong>The event stream is axon's.</strong> axon emits structured events describing every
+      reply — <a href="https://atakang7.github.io/axon/runtime/events/">the events reference</a>
+      covers them. The trace log adds the wire layer those events are built on top of. See
+      <a href="/cortex/docs/playground/reading-traces/">Reading traces</a> for the tool that views them.
+    </div>
+  </div>
+
   <div class="docs-pager"><Pager slug={slug} /></div>
 </Doc>
