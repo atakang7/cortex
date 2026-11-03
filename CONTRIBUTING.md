@@ -15,9 +15,11 @@ Thanks for considering a contribution to cortex.
 git clone https://github.com/atakang7/cortex
 cd cortex
 go build ./...
+go test ./...
+go vet ./...
 ```
 
-The repo currently ships without tests. New behavior changes should land with tests.
+Run `go test ./...` and `go vet ./...` before opening a pull request. Changes to behavior need tests.
 
 ## Philosophy
 
